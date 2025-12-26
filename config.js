@@ -1,0 +1,142 @@
+const fs = require('fs');
+const path = require('path');
+const EventEmitter = require('events');
+require('dotenv').config();
+
+const SETTINGS_DIR = path.join(__dirname, 'Src', 'Settings');
+const emitter = new EventEmitter();
+
+function safeReadJson(filePath) {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function findKeyCaseInsensitive(obj, key) {
+  if (!obj || typeof obj !== 'object') return key;
+  const lower = String(key).toLowerCase();
+  const found = Object.keys(obj).find(k => k.toLowerCase() === lower);
+  return found || key;
+}
+
+function getNestedCaseInsensitive(obj, parts) {
+  let cur = obj;
+  for (const p of parts) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    const key = findKeyCaseInsensitive(cur, p);
+    cur = cur[key];
+  }
+  return cur;
+}
+
+function parseValue(str, preserve) {
+  if (typeof str !== 'string') return str;
+  const v = str.trim();
+  if (preserve) return v;
+  if (/^(true|false)$/i.test(v)) return v.toLowerCase() === 'true';
+  if (/^-?\d+$/.test(v)) return parseInt(v, 10);
+  if (/^-?\d+\.\d+$/.test(v)) return parseFloat(v);
+  if (/^[\[{]/.test(v)) {
+    try { return JSON.parse(v); } catch {}
+  }
+  return v;
+}
+
+function setNested(obj, parts, value) {
+  let cur = obj;
+  for (let i = 0; i < parts.length; i++) {
+    const raw = parts[i];
+    const forceArray = raw.endsWith('[]');
+    const clean = raw.replace(/\[\]$/, '');
+    const key = findKeyCaseInsensitive(cur, clean);
+
+    if (i === parts.length - 1) {
+      const preserve = /(id|token|url|channelid|webhookid|webhooktoken)$/i.test(clean);
+      let parsed;
+
+      if (forceArray) {
+        parsed = value.trim().startsWith('[')
+          ? (() => { try { return JSON.parse(value); } catch { return []; } })()
+          : value.split(',').map(v => parseValue(v, preserve));
+      } else {
+        parsed = parseValue(value, preserve);
+      }
+
+      cur[key] = parsed;
+      return;
+    }
+
+    if (!cur[key] || typeof cur[key] !== 'object') cur[key] = {};
+    cur = cur[key];
+  }
+}
+
+function applyEnv(json, name) {
+  const up = name.toUpperCase();
+  for (const [k, v] of Object.entries(process.env)) {
+    if (!v || !k.startsWith(up)) continue;
+    const parts = k.split(/[-_]/);
+    parts.shift();
+    if (parts.length) setNested(json, parts, v);
+  }
+}
+
+function loadConfigFile(name) {
+  const filePath = path.join(SETTINGS_DIR, `${name}.json`);
+  const json = safeReadJson(filePath);
+  applyEnv(json, name);
+  return { data: json, filePath };
+}
+
+const cache = new Map();
+const watchers = new Map();
+
+function watch(filePath, name) {
+  if (watchers.has(filePath)) return;
+  try {
+    const w = fs.watch(filePath, { persistent: false }, () => {
+      const { data } = loadConfigFile(name);
+      cache.set(name, data);
+      emitter.emit('reload', name, data);
+    });
+    watchers.set(filePath, w);
+  } catch {}
+}
+
+function loadAll(names) {
+  for (const name of names) {
+    const { data, filePath } = loadConfigFile(name);
+    cache.set(name, data);
+    if (process.env.NODE_ENV !== 'production' && fs.existsSync(filePath)) {
+      watch(filePath, name);
+    }
+  }
+}
+
+function get(pathStr, def) {
+  const parts = String(pathStr).split('.');
+  const root = parts.shift();
+  const base = cache.get(root);
+  if (parts.length === 0) return base ?? def;
+  const val = getNestedCaseInsensitive(base, parts);
+  return val ?? def;
+}
+
+function reload(name) {
+  if (!name) return loadAll(DEFAULTS);
+  const { data } = loadConfigFile(name);
+  cache.set(name, data);
+  emitter.emit('reload', name, data);
+}
+
+const DEFAULTS = ['settings', 'embed', 'server', 'logs', 'api'];
+loadAll(DEFAULTS);
+
+module.exports = {
+  get,
+  reload,
+  on: emitter.on.bind(emitter)
+};

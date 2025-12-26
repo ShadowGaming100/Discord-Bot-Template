@@ -1,0 +1,122 @@
+const { Collection, Client, EmbedBuilder } = require("discord.js");
+const config = require("./config");
+const { loadSlashCommands } = require("./Src/Handlers/slashCommands");
+const { loadEvents } = require("./Src/Handlers/events");
+const { ensurePostgresTables } = require("./Src/Functions/database");
+const { loadAntiCrash } = require("./Src/Handlers/antiCrash");
+const clientSettingsObject = require("./Src/Functions/clientSettingsObject");
+const colors = require("colors");
+const { logger } = require("./Src/Functions/logger");
+
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return [d && `${d}d`, h && `${h}h`, m && `${m}m`, `${s}s`]
+    .filter(Boolean)
+    .join(" ");
+}
+
+// Optimized loading sequence
+async function initializeBot() {
+  try {
+    console.log("🚀 Bot startup initiated...");
+
+    // Parallel initialization
+    const [token] = await Promise.all([
+      Promise.resolve(config.get("settings.bot.token")?.trim()),
+      ensurePostgresTables().catch(console.error),
+    ]);
+
+    if (!token) throw new Error("Bot token not defined");
+
+    const client = new Client(clientSettingsObject());
+
+    const collections = [
+      "slashCommands",
+      "messageCommands",
+      "events",
+      "categories",
+      "cooldowns",
+    ];
+    collections.forEach((prop) => (client[prop] = new Collection()));
+
+    loadAntiCrash(client, colors);
+
+    await loadEvents(client);
+
+    await client.login(token);
+
+    console.log(`🔑 Logged in as ${client.user.tag}`);
+
+    loadSlashCommands(client);
+
+    return client;
+  } catch (error) {
+    console.error("❌ Startup error:", error);
+    process.exit(1);
+  }
+}
+
+async function setupShutdownHandlers(client) {
+  let botStartTimestamp = Date.now();
+
+  const shutdown = async (signal) => {
+    console.log(`⚡ Shutdown signal received: ${signal}`);
+
+    if (client?.user) {
+      const guilds = client.guilds.cache;
+      const totalGuilds = guilds.size;
+      const totalUsers = guilds.reduce(
+        (acc, g) => acc + (g.memberCount || 0),
+        0
+      );
+      const botUptime = Date.now() - botStartTimestamp;
+
+      const embed = new EmbedBuilder()
+        .setTitle("🛑 Client Shutdown")
+        .setColor(0xffa500)
+        .setTimestamp()
+        .addFields(
+          {
+            name: "📊 Final Statistics",
+            value: `Guilds: ${totalGuilds}\nUsers: ${totalUsers}`,
+            inline: true,
+          },
+          {
+            name: "⚙️ Shutdown Info",
+            value: `Reason: ${signal}\nBot Uptime: ${formatUptime(
+              botUptime / 1000
+            )}`,
+            inline: true,
+          }
+        );
+
+      try {
+        await logger.client({ client, embed });
+      } catch (logError) {
+        console.error("Failed to send shutdown log:", logError);
+      }
+    }
+
+    if (client) {
+      console.log("👋 Disconnecting from Discord...");
+      await client.destroy().catch(() => {});
+    }
+
+    console.log("✅ Bot shutdown completed");
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT (Ctrl+C)"));
+  process.on("SIGTERM", () => shutdown("SIGTERM (Termination signal)"));
+}
+
+// Main execution
+(async () => {
+  const client = await initializeBot();
+  if (client) {
+    await setupShutdownHandlers(client);
+  }
+})();
