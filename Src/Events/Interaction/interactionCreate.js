@@ -272,36 +272,62 @@ module.exports = {
 
       /* ───────── LOG SUCCESS ───────── */
       const successEmbed = new EmbedBuilder()
-        .setTitle("✅ Command Executed")
-        .setColor(0x00ff00)
-        .setTimestamp()
+        .setAuthor({
+          name: "✅ Command Executed Successfully",
+          iconURL: interaction.user.displayAvatarURL()
+        })
+        .setDescription(
+          `\`/${fullName}\` executed by **${interaction.user.tag}**`
+        )
+        .setColor(0x00ff00) // Green for success
+        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
         .addFields(
-          { name: "📝 Command", value: `\`/${fullName}\``, inline: true },
           {
-            name: "👤 User",
-            value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-            inline: true,
+            name: "👤 User Information",
+            value:
+              `\`\`\`yml\n` +
+              `Username: ${interaction.user.tag}\n` +
+              `User ID:  ${interaction.user.id}\n` +
+              `Account:  ${interaction.user.bot ? 'Bot' : 'User'}\n` +
+              `\`\`\``,
+            inline: true
           },
           {
-            name: "📁 Location",
-            value: guild?.name || "Private Message",
-            inline: true,
+            name: "📍 Location Context",
+            value:
+              `\`\`\`yml\n` +
+              `Guild:   ${guild?.name || "Private Message"}\n` +
+              `Channel: $  {interaction.channel?.name || "DM"}\n` +
+              `Type:    ${inGuild ? 'Guild' : inPrivateChannel ? 'Private' : 'DM'}\n` +
+              `\`\`\``,
+            inline: true
           },
           {
-            name: "📍 Channel",
-            value: interaction.channel?.name || "DM",
-            inline: true,
+            name: "⚡ Performance Metrics",
+            value:
+              `\`\`\`yml\n` +
+              `Execution Time: ${executionTime}ms\n` +
+              `Timestamp:      ${new Date().toLocaleTimeString()}\n` +
+              `Status:         Success ✓\n` +
+              `\`\`\``,
+            inline: true
           },
           {
-            name: "⏱️ Execution Time",
-            value: `${executionTime}ms`,
-            inline: true,
+            name: "📝 Command Details",
+            value:
+              `\`\`\`yml\n` +
+              `Command:  /${fullName}\n` +
+              `Category: ${command.category || 'General'}\n` +
+              `Type:     Slash Command\n` +
+              `\`\`\``,
+            inline: false
           }
         )
         .setFooter({
-          text: `Bot: ${client.user.tag}`,
+          text: `Bot: ${client.user.tag} • Command Logger`,
           iconURL: client.user.displayAvatarURL(),
-        });
+        })
+        .setTimestamp();
 
       await logger.command({ client, embed: successEmbed });
     } catch (err) {

@@ -1,5 +1,6 @@
 const { EmbedBuilder, WebhookClient } = require("discord.js");
 const config = require("../../config");
+const { sanitizeForLogging } = require("./security-utils");
 
 class WebhookPool {
   constructor(maxSize = 10) {
@@ -36,24 +37,52 @@ class DiscordLogger {
   }
 
   formatStack(stack) {
-    if (!stack) return null;
+    if (!stack) {
+      return null;
+    }
+    
+    // In production, limit stack trace length and remove file paths
+    let processedStack = stack;
+    if (process.env.NODE_ENV === 'production') {
+      // Only show first 3 lines of stack
+      const lines = stack.split('\n').slice(0, 3);
+      // Remove absolute file paths
+      processedStack = lines.map(line => 
+        line.replace(/\/[^\s]+\//g, '.../').replace(/\\[^\s]+\\/g, '...\\\\')  
+      ).join('\n');
+    }
+    
     const chunks = [];
-    for (let i = 0; i < stack.length; i += 1000) {
-      chunks.push(stack.slice(i, i + 1000));
+    for (let i = 0; i < processedStack.length; i += 1000) {
+      chunks.push(processedStack.slice(i, i + 1000));
     }
     return chunks.map((text, idx) => ({ name: idx === 0 ? "Stack Trace" : "\u200b", value: `\`\`\`${text}\`\`\`` }));
   }
 
   async send({ client, type = "error", title, description, fields, embed, error }) {
     const cfg = this.getConfig(type);
-    if (!cfg.enabled) return false;
+    if (!cfg.enabled) {
+      return false;
+    }
 
     const baseEmbed = embed instanceof EmbedBuilder ? embed : new EmbedBuilder().setTimestamp();
-    if (title) baseEmbed.setTitle(title);
-    if (description) baseEmbed.setDescription(description);
+    if (title) {
+      baseEmbed.setTitle(title);
+    }
+    if (description) {
+      baseEmbed.setDescription(description);
+    }
 
-    let finalFields = Array.isArray(fields) ? [...fields] : [];
-    if (error) finalFields.push(...this.formatStack(error.stack || String(error)));
+    // Sanitize fields before logging
+    let finalFields = Array.isArray(fields) ? fields.map(f => ({
+      ...f,
+      value: typeof f.value === 'string' ? f.value : JSON.stringify(sanitizeForLogging(f.value))
+    })) : [];
+    
+    if (error) {
+      finalFields.push(...this.formatStack(error.stack || String(error)));
+    }
+    
     baseEmbed.addFields(finalFields.slice(0, 25));
 
     if (cfg.webhook) {

@@ -5,6 +5,11 @@
     InteractionContextType,
   } = require("discord.js");
 
+  /**
+   * Load all slash commands from the Commands/Slash directory
+   * @param {Client} client - The Discord client instance
+   * @returns {Promise<void>}
+   */
   async function loadSlashCommands(client) {
     try {
       client.slashCommands = client.slashCommands || new Map();
@@ -48,7 +53,9 @@
                 delete require.cache[require.resolve(fullPath)];
                 const mod = require(fullPath);
                 const json = extract(mod);
-                if (!json) continue;
+                if (!json) {
+                  continue;
+                }
 
                 group.addSubcommand(sc => applyOptions(sc, json));
 
@@ -74,7 +81,9 @@
             delete require.cache[require.resolve(fullPath)];
             const mod = require(fullPath);
             const json = extract(mod);
-            if (!json) continue;
+            if (!json) {
+              continue;
+            }
 
             builder.addSubcommand(sc => applyOptions(sc, json));
 
@@ -101,30 +110,51 @@
     }
   }
 
+  /**
+   * Extract command data from a command module
+   * @param {object} mod - The command module
+   * @returns {object|null} The command data object or null if invalid
+   */
   function extract(mod) {
-    if (!mod.data?.setName || !mod.name || !mod.description) return null;
+    if (!mod.data?.setName || !mod.name || !mod.description) {
+      return null;
+    }
     const b = mod.data.setName(mod.name).setDescription(mod.description);
     return b.toJSON();
   }
 
+  /**
+   * Apply command options to a subcommand builder
+   * @param {SubcommandBuilder} builder - The subcommand builder
+   * @param {object} json - The command JSON data
+   * @returns {SubcommandBuilder} The configured builder
+   */
   function applyOptions(builder, json) {
-    builder.setName(json.name).setDescription(json.description);
+    builder.setName(json  .name).setDescription(json.description);
 
     (json.options || []).forEach(o => {
       switch (o.type) {
         case 3:
           builder.addStringOption(opt => {
             let op = opt.setName(o.name).setDescription(o.description).setRequired(o.required || false);
-            if (o.autocomplete) op.setAutocomplete(true);
-            if (o.choices) o.choices.forEach(c => op.addChoices({ name: c.name, value: c.value }));
+            if (o.autocomplete) {
+              op.setAutocomplete(true);
+            }
+            if (o.choices) {
+              o.choices.forEach(c => op.addChoices({ name: c.name, value: c.value }));
+            }
             return op;
           });
           break;
         case 4:
           builder.addIntegerOption(opt => {
             let op = opt.setName(o.name).setDescription(o.description).setRequired(o.required || false);
-            if (o.min_value != null) op.setMinValue(o.min_value);
-            if (o.max_value != null) op.setMaxValue(o.max_value);
+            if (o.min_value != null) {
+              op.setMinValue(o.min_value);
+            }
+            if (o.max_value != null) {
+              op.setMaxValue(o.max_value);
+            }
             return op;
           });
           break;
@@ -146,8 +176,12 @@
         case 10:
           builder.addNumberOption(opt => {
             let op = opt.setName(o.name).setDescription(o.description).setRequired(o.required || false);
-            if (o.min_value != null) op.setMinValue(o.min_value);
-            if (o.max_value != null) op.setMaxValue(o.max_value);
+            if (o.min_value != null) {
+              op.setMinValue(o.min_value);
+            }
+            if (o.max_value != null) {
+              op.setMaxValue(o.max_value);
+            }
             return op;
           });
           break;

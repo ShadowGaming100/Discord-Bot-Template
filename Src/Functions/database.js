@@ -1,6 +1,8 @@
 const { Pool } = require("pg");
 const { getTableSchemas } = require("./tableSchemas");
 const config = require("../../config");
+const { isValidTableName, isValidColumnName } = require("./validation");
+const { sanitizeErrorMessage, sanitizeForLogging } = require("./security-utils");
 class DatabaseManager {
   constructor() {
     this.pool = null;
@@ -10,30 +12,36 @@ class DatabaseManager {
     this.waitLogPrinted = false;
 
     const pgConfig = config.get("server.postgres", {});
+    
+    // Validate critical configuration
+    if (!pgConfig.host || !pgConfig.database || !pgConfig.user) {
+      console.warn("⚠️ Database configuration incomplete. Some features may not work.");
+    }
+    
+    // Determine SSL configuration
+    let sslConfig = false;
+    if (pgConfig.ssl === true || process.env.SERVER_POSTGRES_SSL === "true") {
+      sslConfig = true;
+    } else if (pgConfig.noVerifySSL || process.env.SERVER_POSTGRES_NOVERIFYSSL === "true") {
+      sslConfig = { rejectUnauthorized: false };
+    }
+    
     this.poolConfig = {
       user: pgConfig.user,
-
       host: pgConfig.host,
       database: pgConfig.database,
       password: pgConfig.password,
-      port: pgConfig.port,
-      applicationName: pgConfig.applicationName,
-      ssl: pgConfig.noVerifySSL ? { rejectUnauthorized: false } : false,
+      port: pgConfig.port || 5432,
+      applicationName: pgConfig.applicationName || "Discord Bot",
+      ssl: sslConfig,
       connectionTimeoutMillis: 5000,
       statement_timeout: 5000,
-      max: 1,
+      max: 10, // Increased from 1 for better concurrency
+      idleTimeoutMillis: 30000
     };
   }
 
-  _getSSLConfig() {
-    if (process.env.PG_NO_VERIFY_SSL === "true") {
-      return { rejectUnauthorized: false };
-    }
-    if (process.env.PG_SSL === "true") {
-      return true;
-    }
-    return false;
-  }
+
 
   /**
    * Initialize database connection
@@ -75,9 +83,16 @@ class DatabaseManager {
 
       this.initialized = true;
     } catch (error) {
-      console.error("❌ PostgreSQL connection failed:", error.message || error);
+      const safeMessage = sanitizeErrorMessage(error, process.env.NODE_ENV !== 'production');
+      console.error("❌ PostgreSQL connection failed:", safeMessage);
+      
+      // Log full error in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Full error details:", error);
+      }
+      
       this.isAvailable = false;
-      throw error;
+      throw new Error(`Database connection failed: ${safeMessage}`);
     }
   }
 
@@ -119,23 +134,31 @@ class DatabaseManager {
 
     try {
       const start = Date.now();
+      
+      // Sanitize query for logging (replace sensitive params)
+      const safeQuery = String(text).substring(0, 200);
+      
       const result = await this.pool.query(text, params);
       const duration = Date.now() - start;
+      
+      // Log slow queries
       if (duration > 5000) {
-        console.warn(
-          `[DB] Slow query (${duration}ms): ${String(text).substring(
-            0,
-            200
-          )}...`
-        );
+        console.warn(`[DB] Slow query (${duration}ms): ${safeQuery}...`);
       }
+      
+      // Log in debug mode
+      if (process.env.DB_DEBUG === "true") {
+        console.log(`[DB] Query (${duration}ms): ${safeQuery}`);
+      }
+      
       return result;
     } catch (error) {
-      console.error(
-        `❌ Query failed: ${String(text).substring(0, 120)}`,
-        error.message || error
-      );
-      throw error;
+      // Sanitize error for logging
+      const safeErr = sanitizeErrorMessage(error, process.env.NODE_ENV !== 'production');
+      console.error(`❌ Query failed: ${String(text).substring(0, 120)}`, safeErr);
+      
+      // Throw with safe message
+      throw new Error(`Database query failed: ${safeErr}`);
     }
   }
 
@@ -156,6 +179,12 @@ class DatabaseManager {
     returnCount = false,
   } = {}) {
     await this.waitForPostgres();
+    
+    // Validate table name to prevent SQL injection
+    if (!isValidTableName(table)) {
+      throw new Error(`Invalid table name: ${table}`);
+    }
+    
     const schema = this.tableSchemas[table];
     if (!schema) throw new Error(`Schema missing: ${table}`);
 
@@ -168,15 +197,28 @@ class DatabaseManager {
     });
 
     const whereSQL = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    
+    // Validate column names if specified
+    if (columns) {
+      for (const col of columns) {
+        if (!isValidColumnName(col)) {
+          throw new Error(`Invalid column name: ${col}`);
+        }
+      }
+    }
     const colsSQL = columns ? columns.map((c) => `"${c}"`).join(",") : "*";
 
     let sql = `SELECT ${colsSQL} FROM "${table}" ${whereSQL}`;
 
-    // Validate sort order
+    // Validate sort order and column
     if (sortBy) {
+      if (!isValidColumnName(sortBy)) {
+        throw new Error(`Invalid sort column: ${sortBy}`);
+      }
       const o = String(sortOrder).toUpperCase();
-      if (o !== "ASC" && o !== "DESC")
+      if (o !== "ASC" && o !== "DESC") {
         throw new Error(`Invalid sort order: ${sortOrder}`);
+      }
       sql += ` ORDER BY "${sortBy}" ${o}`;
     }
 
@@ -203,7 +245,13 @@ class DatabaseManager {
    */
   async saveDb(items, { table } = {}) {
     await this.waitForPostgres();
+    
     if (!table) throw new Error("Table required");
+    
+    // Validate table name
+    if (!isValidTableName(table)) {
+      throw new Error(`Invalid table name: ${table}`);
+    }
 
     const arr = Array.isArray(items) ? items : [items];
     if (!arr.length) return;
@@ -263,7 +311,13 @@ class DatabaseManager {
    */
   async updateDb(item, { table } = {}) {
     await this.waitForPostgres();
+    
     if (!table) throw new Error("Table required");
+    
+    // Validate table name
+    if (!isValidTableName(table)) {
+      throw new Error(`Invalid table name: ${table}`);
+    }
 
     const { columns: cols, primaryKeys } = this.tableSchemas[table];
     const pkArr = Array.isArray(primaryKeys) ? primaryKeys : [primaryKeys];
@@ -304,7 +358,13 @@ class DatabaseManager {
    */
   async deleteDb({ table, where }) {
     await this.waitForPostgres();
+    
     if (!table || !where) throw new Error("Table and where required");
+    
+    // Validate table name
+    if (!isValidTableName(table)) {
+      throw new Error(`Invalid table name: ${table}`);
+    }
 
     const schema = this.tableSchemas[table];
     const { conds, vals } = this._buildConditions({
@@ -416,23 +476,38 @@ class DatabaseManager {
   }
 
   /**
-   * getNextId
+   * getNextId - Get the next available ID for a table
+   * @param {string} source - The table name
+   * @returns {Promise<number>} The next available ID
    */
   async getNextId(source) {
     const schemas = this.tableSchemas;
-    if (!schemas[source]) throw new Error(`Unsupported table: ${source}`);
+    if (!schemas[source]) {
+      throw new Error(`Unsupported table: ${source}`);
+    }
 
     const primaryKeys = schemas[source].primaryKeys;
-    if (!primaryKeys)
+    if (!primaryKeys) {
       throw new Error(`Primary keys not defined for table: ${source}`);
+    }
 
     await this.waitForPostgres();
 
+    // Validate table name to prevent SQL injection
+    if (!isValidTableName(source)) {
+      throw new Error(`Invalid table name: ${source}`);
+    }
+
     const pk = primaryKeys;
+    const pkColumn = Array.isArray(pk) ? pk[0] : pk;
+    
+    // Validate column name to prevent SQL injection
+    if (!isValidColumnName(pkColumn)) {
+      throw new Error(`Invalid primary key column name: ${pkColumn}`);
+    }
+
     const res = await this.pool.query(
-      `SELECT MAX("${
-        Array.isArray(pk) ? pk[0] : pk
-      }") AS max_id FROM "${source}"`
+      `SELECT MAX("${pkColumn}") AS max_id FROM "${source}"`
     );
     return (res.rows[0].max_id || 0) + 1;
   }

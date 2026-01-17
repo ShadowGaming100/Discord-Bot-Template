@@ -7,16 +7,7 @@ const { loadAntiCrash } = require("./Src/Handlers/antiCrash");
 const clientSettingsObject = require("./Src/Functions/clientSettingsObject");
 const colors = require("colors");
 const { logger } = require("./Src/Functions/logger");
-
-function formatUptime(seconds) {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return [d && `${d}d`, h && `${h}h`, m && `${m}m`, `${s}s`]
-    .filter(Boolean)
-    .join(" ");
-}
+const { formatUptime } = require("./Src/Functions/format-utils");
 
 // Optimized loading sequence
 async function initializeBot() {
@@ -75,23 +66,63 @@ async function setupShutdownHandlers(client) {
       const botUptime = Date.now() - botStartTimestamp;
 
       const embed = new EmbedBuilder()
-        .setTitle("🛑 Client Shutdown")
-        .setColor(0xffa500)
-        .setTimestamp()
+        .setAuthor({
+          name: "🛑 Bot Shutdown",
+          iconURL: client.user.displayAvatarURL()
+        })
+        .setDescription(
+          `**${client.user.tag}** is shutting down gracefully\n` +
+          `Shutdown initiated by **${signal}**`
+        )
+        .setColor(0xffa500) // Orange for shutdown
+        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
         .addFields(
           {
-            name: "📊 Final Statistics",
-            value: `Guilds: ${totalGuilds}\nUsers: ${totalUsers}`,
-            inline: true,
+            name: "📊 Final Server Statistics",
+            value:
+              `\`\`\`yml\n` +
+              `Guilds:   ${totalGuilds.toLocaleString()}\n` +
+              `Users:    ${totalUsers.toLocaleString()}\n` +
+              `Channels: ${client.channels.cache.size.toLocaleString()}\n` +
+              `\`\`\``,
+            inline: true
           },
           {
-            name: "⚙️ Shutdown Info",
-            value: `Reason: ${signal}\nBot Uptime: ${formatUptime(
-              botUptime / 1000
-            )}`,
-            inline: true,
+            name: "⏱️ Session Information",
+            value:
+              `\`\`\`yml\n` +
+              `Uptime:       ${formatUptime(botUptime / 1000)}\n` +
+              `Shutdown At:  ${new Date().toLocaleTimeString()}\n` +
+              `Session Date: ${new Date().toLocaleDateString()}\n` +
+              `\`\`\``,
+            inline: true
+          },
+          {
+            name: "💻 System Resources",
+            value:
+              `\`\`\`yml\n` +
+              `Memory Used: ${formatBytes(process.memoryUsage().rss)}\n` +
+              `Node.js:     ${process.version}\n` +
+              `Platform:    ${process.platform}\n` +
+              `\`\`\``,
+            inline: true
+          },
+          {
+            name: "🔄 Shutdown Details",
+            value:
+              `\`\`\`yml\n` +
+              `Reason:  ${signal}\n` +
+              `Status:  Graceful Shutdown\n` +
+              `Type:    Clean Exit\n` +
+              `\`\`\``,
+            inline: false
           }
-        );
+        )
+        .setFooter({
+          text: `Bot ID: ${client.user.id} • Discord Bot Template`,
+          iconURL: client.user.displayAvatarURL()
+        })
+        .setTimestamp();
 
       try {
         await logger.client({ client, embed });

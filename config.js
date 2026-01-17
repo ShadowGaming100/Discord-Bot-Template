@@ -6,6 +6,14 @@ require('dotenv').config();
 const SETTINGS_DIR = path.join(__dirname, 'Src', 'Settings');
 const emitter = new EventEmitter();
 
+// Critical configuration keys that must be present in production
+const CRITICAL_KEYS = [
+  'settings.bot.token',
+  'settings.bot.clientid'
+];
+
+const PRODUCTION = process.env.NODE_ENV === 'production';
+
 function safeReadJson(filePath) {
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
@@ -125,6 +133,54 @@ function get(pathStr, def) {
   return val ?? def;
 }
 
+/**
+ * Validate that critical configuration values are present
+ * In production, this will throw an error if critical values are missing
+ */
+function validateCriticalConfig() {
+  const missing = [];
+  const warnings = [];
+  
+  for (const key of CRITICAL_KEYS) {
+    const value = get(key);
+    
+    if (value === undefined || value === null || value === '') {
+      missing.push(key);
+    } else if (typeof value === 'string' && (
+      value === 'your_bot_token_here' ||
+      value === 'your_client_id_here' ||
+      value === 'CONFIGURE_IN_ENV_FILE'
+    )) {
+      warnings.push(`${key} appears to be a placeholder value`);
+    }
+  }
+  
+  if (missing.length > 0) {
+    const errorMsg = `\n❌ CRITICAL CONFIGURATION ERROR:\n` +
+      `Missing required configuration values:\n` +
+      missing.map(k => `  - ${k}`).join('\n') + '\n\n' +
+      `Please check your .env file or environment variables.\n` +
+      `See .env.example for required configuration.\n`;
+    
+    if (PRODUCTION) {
+      // Fail-fast in production
+      console.error(errorMsg);
+      process.exit(1);
+    } else {
+      // Warn in development
+      console.warn(errorMsg);
+    }
+  }
+  
+  if (warnings.length > 0) {
+    console.warn('\n⚠️  Configuration warnings:');
+    warnings.forEach(w => console.warn(`  - ${w}`));
+    console.warn('');
+  }
+  
+  return { valid: missing.length === 0, missing, warnings };
+}
+
 function reload(name) {
   if (!name) return loadAll(DEFAULTS);
   const { data } = loadConfigFile(name);
@@ -135,8 +191,17 @@ function reload(name) {
 const DEFAULTS = ['settings', 'embed', 'server', 'logs', 'api'];
 loadAll(DEFAULTS);
 
+// Validate configuration on load (with small delay to ensure env vars are loaded)
+setTimeout(() => {
+  const validation = validateCriticalConfig();
+  if (validation.valid) {
+    console.log('✅ Configuration validated successfully');
+  }
+}, 100);
+
 module.exports = {
   get,
   reload,
+  validateCriticalConfig,
   on: emitter.on.bind(emitter)
 };

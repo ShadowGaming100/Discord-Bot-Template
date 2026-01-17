@@ -2,7 +2,12 @@ const fs = require("fs").promises;
 const path = require("path");
 const { EventEmitter } = require("events");
 
-async function loadEvents(client, color) {
+/**
+ * Load all Discord.js events from the Events directory
+ * @param {Client} client - The Discord client instance
+ * @returns {Promise<void>}
+ */
+async function loadEvents(client) {
   const basePath = path.join(process.cwd(), "Src", "Events");
   
   try {
@@ -14,7 +19,9 @@ async function loadEvents(client, color) {
 
   // Clear existing listeners
   client.removeAllListeners();
-  if (client.rest?.removeAllListeners) client.rest.removeAllListeners();
+  if (client.rest?.removeAllListeners) {
+    client.rest.removeAllListeners();
+  }
   client.events?.clear?.();
 
   try {
@@ -39,10 +46,14 @@ async function loadEvents(client, color) {
             delete require.cache[require.resolve(filePath)];
             const event = require(filePath);
             
-            if (!event?.name || typeof event.execute !== "function") return;
+            if (!event?.name || typeof event.execute !== "function") {
+              return;
+            }
             
             // Store event
-            if (!client.events) client.events = new Map();
+            if (!client.events) {
+              client.events = new Map();
+            }
             client.events.set(event.name, event);
             
             // Register event listener
@@ -51,7 +62,7 @@ async function loadEvents(client, color) {
             
             emitter[method](event.name, async (...args) => {
               try {
-                await event.execute(...args, client, color);
+                await event.execute(...args, client);
               } catch (error) {
                 console.error(`[EVENTS] Error executing event ${event.name}:`, error.message);
               }

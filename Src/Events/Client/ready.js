@@ -2,6 +2,8 @@ const { ActivityType, EmbedBuilder } = require("discord.js");
 const fs = require("fs").promises;
 const path = require("path");
 const { logger } = require("../../Functions/logger");
+const { formatUptime, formatBytes } = require("../../Functions/format-utils");
+const colors = require("colors");
 
 // Cache for performance
 const settingsCache = {};
@@ -38,13 +40,14 @@ module.exports = {
 
       const settings = settingsCache.data;
 
+      // Display professional console banner
+      this.displayConsoleBanner(client);
+
       // Set up status rotation
       setTimeout(() => this.setupStatusRotation(client, settings), 1000);
 
-      // Send ready embed
+      // Send ready embed to Discord
       setTimeout(() => this.sendReadyEmbed(client), 2000);
-
-      console.log(`Bot ${client.user.tag} is now online`);
     } catch (err) {
       console.error("ClientReady error:", err);
 
@@ -56,6 +59,60 @@ module.exports = {
 
       logger.error({ client, embed: errorEmbed }).catch(() => {});
     }
+  },
+
+  /**
+   * Display professional ASCII art banner in console
+   */
+  displayConsoleBanner(client) {
+    const guilds = client.guilds.cache;
+    const totalGuilds = guilds.size;
+    const totalUsers = guilds.reduce((acc, g) => acc + (g.memberCount || 0), 0);
+    const commandCount = client.slashCommands?.size || 0;
+
+    console.log("\n");
+    console.log(colors.cyan("╔════════════════════════════════════════════════════════════════╗"));
+    console.log(colors.cyan("║") + colors.white.bold("                                                                ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.green.bold("   ██████╗ ██╗███████╗ ██████╗ ██████╗ ██████╗ ██████╗        ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.green.bold("   ██╔══██╗██║██╔════╝██╔════╝██╔═══██╗██╔══██╗██╔══██╗       ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.green.bold("   ██║  ██║██║███████╗██║     ██║   ██║██████╔╝██║  ██║       ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.green.bold("   ██║  ██║██║╚════██║██║     ██║   ██║██╔══██╗██║  ██║       ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.green.bold("   ██████╔╝██║███████║╚██████╗╚██████╔╝██║  ██║██████╔╝       ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.green.bold("   ╚═════╝ ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝        ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.yellow.bold("                      BOT TEMPLATE                              ") + colors.cyan("║"));
+    console.log(colors.cyan("║") + colors.white.bold("                                                                ") + colors.cyan("║"));
+    console.log(colors.cyan("╚════════════════════════════════════════════════════════════════╝"));
+    console.log("\n");
+
+    // Bot Information
+    console.log(colors.cyan.bold("📊 Bot Information"));
+    console.log(colors.gray("━".repeat(64)));
+    console.log(colors.white("  Username:       ") + colors.green.bold(client.user.tag));
+    console.log(colors.white("  ID:             ") + colors.yellow(client.user.id));
+    console.log(colors.white("  Environment:    ") + colors.magenta.bold(process.env.NODE_ENV || "development"));
+    console.log("\n");
+
+    // Statistics
+    console.log(colors.cyan.bold("📈 Statistics"));
+    console.log(colors.gray("━".repeat(64)));
+    console.log(colors.white("  Guilds:         ") + colors.green.bold(totalGuilds.toString()));
+    console.log(colors.white("  Users:          ") + colors.green.bold(totalUsers.toLocaleString()));
+    console.log(colors.white("  Commands:       ") + colors.green.bold(commandCount.toString()));
+    console.log(colors.white("  Ping:           ") + colors.yellow.bold(`${client.ws.ping}ms`));
+    console.log("\n");
+
+    // System Information
+    console.log(colors.cyan.bold("💻 System Information"));
+    console.log(colors.gray("━".repeat(64)));
+    console.log(colors.white("  Node.js:        ") + colors.blue(process.version));
+    console.log(colors.white("  Memory Usage:   ") + colors.yellow(formatBytes(process.memoryUsage().rss)));
+    console.log(colors.white("  Platform:       ") + colors.blue(`${process.platform} ${process.arch}`));
+    console.log(colors.white("  Uptime:         ") + colors.green(formatUptime(process.uptime())));
+    console.log("\n");
+
+    console.log(colors.green.bold("✅ Bot is now online and ready!"));
+    console.log(colors.gray("━".repeat(64)));
+    console.log("\n");
   },
 
   async setupStatusRotation(client, settings) {
@@ -80,12 +137,16 @@ module.exports = {
       }));
     }
 
-    if (!statuses.length) return;
+    if (!statuses.length) {
+      return;
+    }
 
     let index = 0;
 
     const setNextStatus = () => {
-      if (!client.user || !statuses[index]) return;
+      if (!client.user || !statuses[index]) {
+        return;
+      }
 
       const status = statuses[index];
       const map = {
@@ -93,8 +154,8 @@ module.exports = {
         users: String(
           client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0)
         ),
-        uptime: this.formatUptime(process.uptime()),
-        memory: this.formatBytes(process.memoryUsage().heapUsed),
+        uptime: formatUptime(process.uptime()),
+        memory: formatBytes(process.memoryUsage().heapUsed),
         version: require("../../../package.json").version,
         shards: client.shard ? client.shard.count : 1,
         devs: settings.developer?.ids?.length || 0,
@@ -141,54 +202,73 @@ module.exports = {
         (acc, g) => acc + (g.memberCount || 0),
         0
       );
+      const commandCount = client.slashCommands?.size || 0;
+      const eventCount = client.events?.size || 0;
+      const nodeVersion = process.version;
+      const environment = process.env.NODE_ENV || "development";
 
       const embed = new EmbedBuilder()
-        .setTitle("🚀 Client Ready")
-        .setColor(0x00ff00)
-        .setTimestamp()
-        .setFooter({
-          text: `Bot ID: ${client.user.id}`,
-          iconURL: client.user.displayAvatarURL(),
+        .setAuthor({
+          name: "🚀 Bot Successfully Started",
+          iconURL: client.user.displayAvatarURL()
         })
+        .setDescription(
+          `**${client.user.tag}** is now online and ready to serve!\n` +
+          `Running in **${environment.toUpperCase()}** mode`
+        )
+        .setColor(0x00ff00) // Green for success
+        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
         .addFields(
           {
-            name: "📊 Bot Statistics",
-            value: `Guilds: ${totalGuilds}\nUsers: ${totalUsers}\nCommands: ${
-              client.slashCommands?.size || 0
-            }`,
-            inline: true,
+            name: "📊 Server Statistics",
+            value: 
+              `\`\`\`yml\n` +
+              `Guilds:   ${totalGuilds.toLocaleString()}\n` +
+              `Users:    ${totalUsers.toLocaleString()}\n` +
+              `Channels: ${client.channels.cache.size.toLocaleString()}\n` +
+              `\`\`\``,
+            inline: true
           },
           {
-            name: "⚙️ Performance",
-            value: `WS Ping: ${client.ws.ping}ms\nMemory: ${this.formatBytes(
-              process.memoryUsage().rss
-            )}`,
-            inline: true,
+            name: "⚙️ Bot Configuration",
+            value:
+              `\`\`\`yml\n` +
+              `Commands: ${commandCount}\n` +
+              `Events:   ${eventCount}\n` +
+              `Shards:   ${client.shard?.count || 1}\n` +
+              `\`\`\``,
+            inline: true
+          },
+          {
+            name: "💻 System Resources",
+            value:
+              `\`\`\`yml\n` +
+              `Memory:   ${formatBytes(process.memoryUsage().rss)}\n` +
+              `Node.js:  ${nodeVersion}\n` +
+              `Platform: ${process.platform}\n` +
+              `\`\`\``,
+            inline: true
+          },
+          {
+            name: "🌐 Connection Details",
+            value:
+              `\`\`\`yml\n` +
+              `WebSocket Ping: ${client.ws.ping}ms\n` +
+              `Ready Since:    ${new Date().toLocaleTimeString()}\n` +
+              `Uptime:         ${formatUptime(process.uptime())}\n` +
+              `\`\`\``,
+            inline: false
           }
-        );
+        )
+        .setFooter({
+          text: `Bot ID: ${client.user.id} • Discord Bot Template`,
+          iconURL: client.user.displayAvatarURL()
+        })
+        .setTimestamp();
 
       await logger.client({ client, embed });
     } catch (err) {
       console.error("Failed to send ready embed:", err.message);
     }
-  },
-
-  formatUptime(seconds) {
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor((seconds % 86400) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    return [d && `${d}d`, h && `${h}h`, m && `${m}m`, `${s}s`]
-      .filter(Boolean)
-      .join(" ");
-  },
-
-  formatBytes(bytes) {
-    if (!bytes) return "0 B";
-    const k = 1024;
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${
-      ["B", "KB", "MB", "GB", "TB"][i]
-    }`;
-  },
+  }
 };
