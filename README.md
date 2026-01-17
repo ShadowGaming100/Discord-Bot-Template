@@ -164,7 +164,7 @@ module.exports = {
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `SETTINGS_BOT_TOKEN` | Your Discord bot token | `MTIzNDU2Nzg5MDEyMzQ1Njc4.GaBcDe.FgHiJkLmNoPqRsTuVwXyZ123456` |
+| `SETTINGS_BOT_TOKEN` | Your Discord bot token | `Discord Bot Toekn` |
 | `SETTINGS_BOT_CLIENTID` | Your application client ID | `123456789012345678` |
 | `SETTINGS_DEVELOPER_IDS` | Comma-separated developer user IDs | `123456789012345678,987654321098765432` |
 
