@@ -162,11 +162,11 @@ module.exports = {
 
 ### Required Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SETTINGS_BOT_TOKEN` | Your Discord bot token | `Discord Bot Toekn` |
-| `SETTINGS_BOT_CLIENTID` | Your application client ID | `123456789012345678` |
-| `SETTINGS_DEVELOPER_IDS` | Comma-separated developer user IDs | `123456789012345678,987654321098765432` |
+| Variable | Description |
+|----------|-------------|
+| `SETTINGS_BOT_TOKEN` | Your Discord bot token | 
+| `SETTINGS_BOT_CLIENTID` | Your application client ID | 
+| `SETTINGS_DEVELOPER_IDS` | Comma-separated developer user IDs |
 
 ### Optional Variables
 
