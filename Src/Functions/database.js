@@ -1,67 +1,54 @@
-const { Pool } = require("pg");
-const { getTableSchemas } = require("./tableSchemas");
-const config = require("../../config");
-const { isValidTableName, isValidColumnName } = require("./validation");
-const { sanitizeErrorMessage, sanitizeForLogging } = require("./security-utils");
+const { PrismaClient } = require('@prisma/client');
+const { getTableSchemas } = require('./tableSchemas');
+const config = require('../../config');
+const { isValidTableName, isValidColumnName } = require('./validation');
+const { sanitizeErrorMessage } = require('./security-utils');
+
 class DatabaseManager {
   constructor() {
-    this.pool = null;
+    this.prisma = null;
     this.isAvailable = false;
     this.tableSchemas = getTableSchemas();
     this.initialized = false;
     this.waitLogPrinted = false;
 
-    const pgConfig = config.get("server.postgres", {});
-    
+    const pgConfig = config.get('server.postgres', {});
+
     // Validate critical configuration
     if (!pgConfig.host || !pgConfig.database || !pgConfig.user) {
-      console.warn("⚠️ Database configuration incomplete. Some features may not work.");
+      console.warn('⚠️ Database configuration incomplete. Some features may not work.');
     }
-    
-    // Determine SSL configuration
-    let sslConfig = false;
-    if (pgConfig.ssl === true || process.env.SERVER_POSTGRES_SSL === "true") {
-      sslConfig = true;
-    } else if (pgConfig.noVerifySSL || process.env.SERVER_POSTGRES_NOVERIFYSSL === "true") {
-      sslConfig = { rejectUnauthorized: false };
-    }
-    
-    this.poolConfig = {
-      user: pgConfig.user,
-      host: pgConfig.host,
-      database: pgConfig.database,
-      password: pgConfig.password,
-      port: pgConfig.port || 5432,
-      applicationName: pgConfig.applicationName || "Discord Bot",
-      ssl: sslConfig,
-      connectionTimeoutMillis: 5000,
-      statement_timeout: 5000,
-      max: 10, // Increased from 1 for better concurrency
-      idleTimeoutMillis: 30000
-    };
   }
-
-
 
   /**
    * Initialize database connection
    */
   async initialize() {
-    if (this.initialized) return;
+    if (this.initialized) {
+      return;
+    }
 
     try {
-      this.pool = new Pool(this.poolConfig);
-      const client = await this.pool.connect();
-      this.isAvailable = true;
-      client.release();
-      console.log("✅ PostgreSQL connected");
+      this.prisma = new PrismaClient({
+        log: process.env.DB_DEBUG === 'true' ? ['query', 'info', 'warn', 'error'] : ['warn', 'error'],
+        datasources: {
+          db: {
+            url: this._buildConnectionString()
+          }
+        }
+      });
 
-      // Warm up tables (exact same logic)
+      // Test connection
+      await this.prisma.$connect();
+      this.isAvailable = true;
+      console.log('✅ PostgreSQL connected (Prisma)');
+
+      // Warm up tables
       const tables = Object.keys(this.tableSchemas);
       const warmupResults = await Promise.allSettled(
         tables.map(async (table) => {
           try {
-            await this.pool.query(`SELECT 1 FROM "${table}" LIMIT 1`);
+            await this.prisma.$queryRawUnsafe(`SELECT 1 FROM "${table}" LIMIT 1`);
             return { table, ok: true };
           } catch (error) {
             return { table, ok: false, error: error.message };
@@ -70,7 +57,7 @@ class DatabaseManager {
       );
 
       const failed = warmupResults.filter(
-        (r) => r.status === "fulfilled" && r.value && !r.value.ok
+        (r) => r.status === 'fulfilled' && r.value && !r.value.ok
       );
       if (failed.length > 0) {
         console.warn(
@@ -84,28 +71,50 @@ class DatabaseManager {
       this.initialized = true;
     } catch (error) {
       const safeMessage = sanitizeErrorMessage(error, process.env.NODE_ENV !== 'production');
-      console.error("❌ PostgreSQL connection failed:", safeMessage);
-      
-      // Log full error in development
+      console.error('❌ PostgreSQL connection failed:', safeMessage);
+
       if (process.env.NODE_ENV !== 'production') {
-        console.error("Full error details:", error);
+        console.error('Full error details:', error);
       }
-      
+
       this.isAvailable = false;
       throw new Error(`Database connection failed: ${safeMessage}`);
     }
   }
 
   /**
+   * Build Prisma connection string from config
+   */
+  _buildConnectionString() {
+    const pgConfig = config.get('server.postgres', {});
+    const user = pgConfig.user;
+    const password = pgConfig.password || '';
+    const host = pgConfig.host;
+    const port = pgConfig.port || 5432;
+    const database = pgConfig.database;
+
+    let sslParam = '';
+    if (pgConfig.ssl === true || process.env.SERVER_POSTGRES_SSL === 'true') {
+      sslParam = '?sslmode=require';
+    } else if (pgConfig.noVerifySSL || process.env.SERVER_POSTGRES_NOVERIFYSSL === 'true') {
+      sslParam = '?sslmode=require&sslaccept=accept_invalid_certs';
+    }
+
+    return `postgresql://${user}:${password}@${host}:${port}/${database}${sslParam}`;
+  }
+
+  /**
    * Wait for PostgreSQL
    */
   async waitForPostgres(timeoutMs = 10000) {
-    if (this.isAvailable) return;
+    if (this.isAvailable) {
+      return;
+    }
     const interval = 500;
     const start = Date.now();
 
     if (!this.waitLogPrinted) {
-      console.log("⏳ Waiting for PostgreSQL connection...");
+      console.log('⏳ Waiting for PostgreSQL connection...');
       this.waitLogPrinted = true;
     }
 
@@ -119,45 +128,45 @@ class DatabaseManager {
     }
 
     if (this.waitLogPrinted) {
-      console.log("✅ PostgreSQL is now available");
+      console.log('✅ PostgreSQL is now available');
       this.waitLogPrinted = false;
     }
   }
 
   /**
-   * Raw query (matches reference signature and behavior)
+   * Raw query (Prisma equivalent)
    */
   async rawQuery(text, params = []) {
     await this.waitForPostgres();
 
-    if (!this.pool) throw new Error("Pool not initialized");
+    if (!this.prisma) {
+      throw new Error('Prisma not initialized');
+    }
 
     try {
       const start = Date.now();
-      
-      // Sanitize query for logging (replace sensitive params)
       const safeQuery = String(text).substring(0, 200);
-      
-      const result = await this.pool.query(text, params);
+
+      // Prisma uses $1, $2 style parameters like pg
+      const result = await this.prisma.$queryRawUnsafe(text, ...params);
       const duration = Date.now() - start;
-      
-      // Log slow queries
+
       if (duration > 5000) {
         console.warn(`[DB] Slow query (${duration}ms): ${safeQuery}...`);
       }
-      
-      // Log in debug mode
-      if (process.env.DB_DEBUG === "true") {
+
+      if (process.env.DB_DEBUG === 'true') {
         console.log(`[DB] Query (${duration}ms): ${safeQuery}`);
       }
-      
-      return result;
+
+      // Convert Prisma result to pg-like format
+      return {
+        rows: Array.isArray(result) ? result : [],
+        rowCount: Array.isArray(result) ? result.length : 0
+      };
     } catch (error) {
-      // Sanitize error for logging
       const safeErr = sanitizeErrorMessage(error, process.env.NODE_ENV !== 'production');
       console.error(`❌ Query failed: ${String(text).substring(0, 120)}`, safeErr);
-      
-      // Throw with safe message
       throw new Error(`Database query failed: ${safeErr}`);
     }
   }
@@ -175,30 +184,30 @@ class DatabaseManager {
     offset = 0,
     columns = null,
     sortBy = null,
-    sortOrder = "ASC",
-    returnCount = false,
+    sortOrder = 'ASC',
+    returnCount = false
   } = {}) {
     await this.waitForPostgres();
-    
-    // Validate table name to prevent SQL injection
+
     if (!isValidTableName(table)) {
       throw new Error(`Invalid table name: ${table}`);
     }
-    
+
     const schema = this.tableSchemas[table];
-    if (!schema) throw new Error(`Schema missing: ${table}`);
+    if (!schema) {
+      throw new Error(`Schema missing: ${table}`);
+    }
 
     const pk = primaryKey || schema.primaryKeys;
     const { conds, vals } = this._buildConditions({
       id,
       where,
       pk,
-      ci: caseInsensitive,
+      ci: caseInsensitive
     });
 
-    const whereSQL = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
-    
-    // Validate column names if specified
+    const whereSQL = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
     if (columns) {
       for (const col of columns) {
         if (!isValidColumnName(col)) {
@@ -206,29 +215,35 @@ class DatabaseManager {
         }
       }
     }
-    const colsSQL = columns ? columns.map((c) => `"${c}"`).join(",") : "*";
+    const colsSQL = columns ? columns.map((c) => `"${c}"`).join(',') : '*';
 
     let sql = `SELECT ${colsSQL} FROM "${table}" ${whereSQL}`;
 
-    // Validate sort order and column
     if (sortBy) {
       if (!isValidColumnName(sortBy)) {
         throw new Error(`Invalid sort column: ${sortBy}`);
       }
       const o = String(sortOrder).toUpperCase();
-      if (o !== "ASC" && o !== "DESC") {
+      if (o !== 'ASC' && o !== 'DESC') {
         throw new Error(`Invalid sort order: ${sortOrder}`);
       }
       sql += ` ORDER BY "${sortBy}" ${o}`;
     }
 
-    if (id != null) sql += " LIMIT 1";
-    else sql += ` LIMIT ${limit || "ALL"} OFFSET ${offset}`;
+    if (id !== null) {
+      sql += ' LIMIT 1';
+    } else {
+      sql += ` LIMIT ${limit || 'ALL'} OFFSET ${offset}`;
+    }
 
     const res = await this.rawQuery(sql, vals);
 
-    if (id != null) return res.rows[0] || null;
-    if (!returnCount) return res.rows;
+    if (id !== null) {
+      return res.rows[0] || null;
+    }
+    if (!returnCount) {
+      return res.rows;
+    }
 
     const countRes = await this.rawQuery(
       `SELECT COUNT(*) FROM "${table}" ${whereSQL}`,
@@ -236,7 +251,7 @@ class DatabaseManager {
     );
     return {
       data: res.rows,
-      count: +countRes.rows[0].count,
+      count: +countRes.rows[0].count
     };
   }
 
@@ -245,34 +260,41 @@ class DatabaseManager {
    */
   async saveDb(items, { table } = {}) {
     await this.waitForPostgres();
-    
-    if (!table) throw new Error("Table required");
-    
-    // Validate table name
+
+    if (!table) {
+      throw new Error('Table required');
+    }
+
     if (!isValidTableName(table)) {
       throw new Error(`Invalid table name: ${table}`);
     }
 
     const arr = Array.isArray(items) ? items : [items];
-    if (!arr.length) return;
+    if (!arr.length) {
+      return;
+    }
 
     const { columns: cols, primaryKeys } = this.tableSchemas[table];
-    if (!cols) throw new Error(`Schema missing: ${table}`);
+    if (!cols) {
+      throw new Error(`Schema missing: ${table}`);
+    }
 
     const useCols = [
       ...new Set(
         arr.flatMap((it) => Object.keys(it).filter((c) => cols.includes(c)))
-      ),
+      )
     ];
-    if (!useCols.length) return;
+    if (!useCols.length) {
+      return;
+    }
 
-    const conflict = primaryKeys.map((k) => `"${k}"`).join(",");
+    const conflict = primaryKeys.map((k) => `"${k}"`).join(',');
     const updates = useCols.filter((c) => !primaryKeys.includes(c));
 
     // Stringify objects/arrays
     arr.forEach((item) => {
       Object.keys(item).forEach((key) => {
-        if (Array.isArray(item[key]) || typeof item[key] === "object") {
+        if (Array.isArray(item[key]) || typeof item[key] === 'object') {
           item[key] = JSON.stringify(item[key]);
         }
       });
@@ -286,20 +308,20 @@ class DatabaseManager {
           (_, bi) =>
             `(${useCols
               .map((_, ci) => `$${bi * useCols.length + ci + 1}`)
-              .join(",")})`
+              .join(',')})`
         )
-        .join(",");
+        .join(',');
 
       const vals = batch.flatMap((row) => useCols.map((c) => row[c] ?? null));
 
       let sql = `INSERT INTO "${table}" (${useCols
         .map((c) => `"${c}"`)
-        .join(",")}) VALUES ${ph}`;
+        .join(',')}) VALUES ${ph}`;
 
       if (updates.length) {
         sql += ` ON CONFLICT (${conflict}) DO UPDATE SET ${updates
           .map((c) => `"${c}"=EXCLUDED."${c}"`)
-          .join(",")}`;
+          .join(',')}`;
       }
 
       await this.rawQuery(sql, vals);
@@ -311,10 +333,11 @@ class DatabaseManager {
    */
   async updateDb(item, { table } = {}) {
     await this.waitForPostgres();
-    
-    if (!table) throw new Error("Table required");
-    
-    // Validate table name
+
+    if (!table) {
+      throw new Error('Table required');
+    }
+
     if (!isValidTableName(table)) {
       throw new Error(`Invalid table name: ${table}`);
     }
@@ -323,7 +346,7 @@ class DatabaseManager {
     const pkArr = Array.isArray(primaryKeys) ? primaryKeys : [primaryKeys];
 
     for (const k of pkArr) {
-      if (item[k] == null) {
+      if (item[k] === null) {
         throw new Error(
           `Missing primary key '${k}' for updateDb on table ${table}`
         );
@@ -333,18 +356,20 @@ class DatabaseManager {
     const setCols = Object.keys(item).filter(
       (c) => cols.includes(c) && !pkArr.includes(c)
     );
-    if (setCols.length === 0) return 0;
+    if (setCols.length === 0) {
+      return 0;
+    }
 
-    const setClauses = setCols.map((c, i) => `"${c}" = $${i + 1}`).join(", ");
+    const setClauses = setCols.map((c, i) => `"${c}" = $${i + 1}`).join(', ');
     const setVals = setCols.map((c) =>
-      typeof item[c] === "object" && item[c] !== null
+      typeof item[c] === 'object' && item[c] !== null
         ? JSON.stringify(item[c])
         : item[c]
     );
 
     const whereClauses = pkArr
       .map((k, i) => `"${k}" = $${setCols.length + i + 1}`)
-      .join(" AND ");
+      .join(' AND ');
     const whereVals = pkArr.map((k) => item[k]);
 
     const sql = `UPDATE "${table}" SET ${setClauses} WHERE ${whereClauses}`;
@@ -358,10 +383,11 @@ class DatabaseManager {
    */
   async deleteDb({ table, where }) {
     await this.waitForPostgres();
-    
-    if (!table || !where) throw new Error("Table and where required");
-    
-    // Validate table name
+
+    if (!table || !where) {
+      throw new Error('Table and where required');
+    }
+
     if (!isValidTableName(table)) {
       throw new Error(`Invalid table name: ${table}`);
     }
@@ -371,13 +397,15 @@ class DatabaseManager {
       id: null,
       where,
       pk: schema.primaryKeys,
-      ci: false,
+      ci: false
     });
 
-    if (!conds.length) throw new Error("Refusing to delete without conditions");
+    if (!conds.length) {
+      throw new Error('Refusing to delete without conditions');
+    }
 
     const res = await this.rawQuery(
-      `DELETE FROM "${table}" WHERE ${conds.join(" AND ")}`,
+      `DELETE FROM "${table}" WHERE ${conds.join(' AND ')}`,
       vals
     );
     return res.rowCount;
@@ -388,21 +416,20 @@ class DatabaseManager {
    */
   async ensurePostgresTables() {
     await this.waitForPostgres();
-    console.log("🔧 Ensuring table schemas are up to date...");
+    console.log('🔧 Ensuring table schemas are up to date...');
 
-    const client = await this.pool.connect();
     try {
       const schemas = this.tableSchemas;
       const names = Object.keys(schemas);
 
-      const { rows } = await client.query(
+      const result = await this.prisma.$queryRawUnsafe(
         `SELECT table_name, column_name
          FROM information_schema.columns
          WHERE table_schema = 'public' AND table_name = ANY($1)`,
-        [names]
+        names
       );
 
-      const colsMap = rows.reduce((map, { table_name, column_name }) => {
+      const colsMap = result.reduce((map, { table_name, column_name }) => {
         map[table_name] = map[table_name] || new Set();
         map[table_name].add(column_name);
         return map;
@@ -414,21 +441,20 @@ class DatabaseManager {
       for (const table of names) {
         const { createSQL, columns: definedColumns } = schemas[table];
 
-        const tableExists = (
-          await client.query(
-            `SELECT EXISTS (
-              SELECT FROM information_schema.tables
-              WHERE table_schema = 'public'
-              AND table_name = $1
-            )`,
-            [table]
-          )
-        ).rows[0].exists;
+        const existsResult = await this.prisma.$queryRawUnsafe(
+          `SELECT EXISTS (
+            SELECT FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name = $1
+          )`,
+          table
+        );
+        const tableExists = existsResult[0].exists;
 
         if (!tableExists) {
           created++;
           console.log(`➡️ Creating table: ${table}`);
-          await client.query(createSQL);
+          await this.prisma.$executeRawUnsafe(createSQL);
           continue;
         }
 
@@ -442,7 +468,7 @@ class DatabaseManager {
           console.log(
             `➕ Adding ${
               missingColumns.length
-            } columns to ${table}: ${missingColumns.join(", ")}`
+            } columns to ${table}: ${missingColumns.join(', ')}`
           );
 
           for (const column of missingColumns) {
@@ -450,8 +476,8 @@ class DatabaseManager {
               const columnDefMatch = createSQL.match(
                 new RegExp(`"${column}"\\s+([^,]+)`)
               );
-              const columnDef = columnDefMatch ? columnDefMatch[1] : "TEXT";
-              await client.query(
+              const columnDef = columnDefMatch ? columnDefMatch[1] : 'TEXT';
+              await this.prisma.$executeRawUnsafe(
                 `ALTER TABLE "${table}" ADD COLUMN "${column}" ${columnDef}`
               );
             } catch (error) {
@@ -468,48 +494,46 @@ class DatabaseManager {
         `🔧 Schema check: created ${created} tables, added ${addedColsTotal} columns`
       );
     } catch (error) {
-      console.error("❌ Schema verification failed:", error);
+      console.error('❌ Schema verification failed:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   /**
    * getNextId - Get the next available ID for a table
-   * @param {string} source - The table name
-   * @returns {Promise<number>} The next available ID
    */
-  async getNextId(source) {
-    const schemas = this.tableSchemas;
-    if (!schemas[source]) {
-      throw new Error(`Unsupported table: ${source}`);
-    }
-
-    const primaryKeys = schemas[source].primaryKeys;
-    if (!primaryKeys) {
-      throw new Error(`Primary keys not defined for table: ${source}`);
-    }
-
+  async getNextId({ table } = {}) {
     await this.waitForPostgres();
 
-    // Validate table name to prevent SQL injection
-    if (!isValidTableName(source)) {
-      throw new Error(`Invalid table name: ${source}`);
+    if (!table) {
+      throw new Error('Table required');
+    }
+
+    if (!isValidTableName(table)) {
+      throw new Error(`Invalid table name: ${table}`);
+    }
+
+    const schemas = this.tableSchemas;
+    if (!schemas[table]) {
+      throw new Error(`Unsupported table: ${table}`);
+    }
+
+    const primaryKeys = schemas[table].primaryKeys;
+    if (!primaryKeys) {
+      throw new Error(`Primary keys not defined for table: ${table}`);
     }
 
     const pk = primaryKeys;
     const pkColumn = Array.isArray(pk) ? pk[0] : pk;
-    
-    // Validate column name to prevent SQL injection
+
     if (!isValidColumnName(pkColumn)) {
       throw new Error(`Invalid primary key column name: ${pkColumn}`);
     }
 
-    const res = await this.pool.query(
-      `SELECT MAX("${pkColumn}") AS max_id FROM "${source}"`
+    const res = await this.prisma.$queryRawUnsafe(
+      `SELECT MAX("${pkColumn}") AS max_id FROM "${table}"`
     );
-    return (res.rows[0].max_id || 0) + 1;
+    return (res[0].max_id || 0) + 1;
   }
 
   /**
@@ -527,20 +551,20 @@ class DatabaseManager {
       return (res.rows[0].max_id || 0) + 1;
     } catch (error) {
       console.error(`Error getting next type ID for ${baseType}:`, error);
-      const hosts = await this.loadDb({ table: "hosts" });
+      const hosts = await this.loadDb({ table: 'hosts' });
       let maxId = 0;
 
       for (const host of hosts) {
         try {
           const typeIds =
-            typeof host.type_id === "string"
+            typeof host.type_id === 'string'
               ? JSON.parse(host.type_id)
               : host.type_id;
           if (typeIds && typeIds[baseType] && typeIds[baseType] > maxId) {
             maxId = typeIds[baseType];
           }
         } catch (e) {
-          console.error("Error parsing type_id:", e);
+          console.error('Error parsing type_id:', e);
         }
       }
 
@@ -552,13 +576,13 @@ class DatabaseManager {
    * closePool
    */
   async closePool() {
-    if (this.pool) {
-      console.log("🛑 Closing PostgreSQL pool...");
-      await this.pool.end();
-      this.pool = null;
+    if (this.prisma) {
+      console.log('🛑 Closing Prisma connection...');
+      await this.prisma.$disconnect();
+      this.prisma = null;
       this.isAvailable = false;
       this.initialized = false;
-      console.log("✅ PostgreSQL pool closed");
+      console.log('✅ Prisma connection closed');
     }
   }
 
@@ -578,26 +602,26 @@ class DatabaseManager {
     let idx = 1;
 
     const addCondition = (col, val) => {
-      if (val && typeof val === "object" && val.$like) {
-        const term = `%${val.$like.replace(/%/g, "")}%`;
+      if (val && typeof val === 'object' && val.$like) {
+        const term = `%${val.$like.replace(/%/g, '')}%`;
         vals.push(term);
         return ci
           ? `LOWER("${col}") LIKE LOWER($${idx++})`
           : `"${col}" LIKE $${idx++}`;
       }
 
-      if (val && typeof val === "object") {
+      if (val && typeof val === 'object') {
         return Object.entries(val)
-          .filter(([op]) => ["$lt", "$lte", "$gt", "$gte"].includes(op))
+          .filter(([op]) => ['$lt', '$lte', '$gt', '$gte'].includes(op))
           .map(([op, v]) => {
-            const map = { $lt: "<", $lte: "<=", $gt: ">", $gte: ">=" };
+            const map = { $lt: '<', $lte: '<=', $gt: '>', $gte: '>=' };
             vals.push(v);
             return `"${col}" ${map[op]} $${idx++}`;
           })
-          .join(" AND ");
+          .join(' AND ');
       }
 
-      if (ci && typeof val === "string") {
+      if (ci && typeof val === 'string') {
         vals.push(val);
         return `LOWER("${col}") = LOWER($${idx++})`;
       }
@@ -606,7 +630,7 @@ class DatabaseManager {
       return `"${col}" = $${idx++}`;
     };
 
-    if (id != null) {
+    if (id !== null) {
       if (Array.isArray(pk)) {
         pk.forEach((k) => {
           vals.push(id[k]);
@@ -625,30 +649,32 @@ class DatabaseManager {
             const parts = Object.entries(group)
               .map(([c, v]) => addCondition(c, v))
               .filter(Boolean);
-            if (parts.length === 0) return null;
-            return `(${parts.join(" AND ")})`;
+            if (parts.length === 0) {
+              return null;
+            }
+            return `(${parts.join(' AND ')})`;
           })
           .filter(Boolean);
 
         const otherClauses = Object.entries(where)
-          .filter(([k]) => k !== "$or")
+          .filter(([k]) => k !== '$or')
           .map(([c, v]) => addCondition(c, v))
           .filter(Boolean);
 
         const combined = [
           ...otherClauses,
-          ...(orGroups.length ? [orGroups.join(" OR ")] : []),
+          ...(orGroups.length ? [orGroups.join(' OR ')] : [])
         ];
 
         if (combined.length) {
-          conds.push(`(${combined.join(" AND ")})`);
+          conds.push(`(${combined.join(' AND ')})`);
         }
       } else {
         const clauses = Object.entries(where)
           .map(([c, v]) => addCondition(c, v))
           .filter(Boolean);
         if (clauses.length) {
-          const joiner = Array.isArray(where.$or) ? " OR " : " AND ";
+          const joiner = Array.isArray(where.$or) ? ' OR ' : ' AND ';
           conds.push(`(${clauses.join(joiner)})`);
         }
       }
@@ -662,13 +688,13 @@ class DatabaseManager {
 const db = new DatabaseManager();
 
 // Auto-initialize
-if (process.env.DB_AUTO_INIT !== "false") {
+if (process.env.DB_AUTO_INIT !== 'false') {
   db.initialize().catch(console.error);
 }
 
 // Graceful shutdown
-process.on("SIGTERM", () => db.closePool());
-process.on("SIGINT", () => db.closePool());
+process.on('SIGTERM', () => db.closePool());
+process.on('SIGINT', () => db.closePool());
 
 module.exports = {
   rawQuery: (...args) => db.rawQuery(...args),
@@ -677,11 +703,11 @@ module.exports = {
   updateDb: (item, options) => db.updateDb(item, options),
   deleteDb: (options) => db.deleteDb(options),
   ensurePostgresTables: () => db.ensurePostgresTables(),
-  getNextId: (source) => db.getNextId(source),
+  getNextId: (options) => db.getNextId(options),
   getNextTypeId: (baseType) => db.getNextTypeId(baseType),
   closePool: () => db.closePool(),
   isReady: () => db.isReady(),
 
   buildConditions: (...args) => db._buildConditions(...args),
-  instance: db,
+  instance: db
 };
