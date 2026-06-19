@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Guilds {
+  guildId      String @id @db.VarChar(20)
+  name         String @db.VarChar(100)
+  ownerId      String @db.VarChar(20)
+  memberCount  Int    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("guilds")
+}
+
+model Users {
+  userId       String @id @db.VarChar(20)
+  username     String @db.VarChar(100)
+  discriminator String? @db.VarChar(4)
+  avatar       String? @db.VarChar(255)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+model UserGuilds {
+  id         String @id @default(uuid())
+  userId     String @db.VarChar(20)
+  guildId    String @db.VarChar(20)
+  joinedAt   DateTime @default(now())
+  leftAt     DateTime?
+
+  @@unique([userId, guildId])
+  @@map("user_guilds")
+}
+
+model Commands {
+  id         String @id @default(uuid())
+  name       String @db.VarChar(100)
+  category   String @db.VarChar(50)
+  userId     String @db.VarChar(20)
+  guildId    String @db.VarChar(20)
+  channelId  String? @db.VarChar(20)
+  executedAt DateTime @default(now())
+
+  @@index([name])
+  @@index([userId])
+  @@index([guildId])
+  @@map("commands")
+}
+
+model Settings {
+  guildId    String @id @db.VarChar(20)
+  prefix     String? @default("!") @db.VarChar(5)
+  logChannel String? @db.VarChar(20)
+  welcomeChannel String? @db.VarChar(20)
+  autoRole   String? @db.VarChar(20)
+  customData Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model Cooldowns {
+  id         String @id @default(uuid())
+  command    String @db.VarChar(100)
+  userId     String @db.VarChar(20)
+  guildId    String? @db.VarChar(20)
+  expiresAt  DateTime
+
+  @@index([command, userId, guildId])
+  @@map("cooldowns")
+}

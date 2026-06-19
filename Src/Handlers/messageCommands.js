@@ -1,16 +1,21 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-async function loadMessageCommands(client, color) {
-  const commandsRoot = path.join(process.cwd(), "Src", "Commands", "Message");
+/**
+ * Load message (prefix) commands from the Commands/Message directory
+ * Note: This template uses slash commands only. Prefix commands are optional.
+ * @param {Client} client - The Discord client instance
+ */
+async function loadMessageCommands(client) {
+  const commandsRoot = path.join(process.cwd(), 'Src', 'Commands', 'Message');
 
   if (!fs.existsSync(commandsRoot)) {
-    console.error(`[MESSAGE COMMANDS] Folder not found: ${commandsRoot}`);
+    console.log('[MESSAGE COMMANDS] No Message commands directory found. Using slash commands only.');
+    client.messageCommands = client.messageCommands || new Map();
     return;
   }
 
   client.messageCommands = client.messageCommands || new Map();
-  const publicCommandsArray = [];
   let loadedCount = 0;
 
   const commandFolders = fs.readdirSync(commandsRoot, { withFileTypes: true })
@@ -20,7 +25,7 @@ async function loadMessageCommands(client, color) {
   for (const folder of commandFolders) {
     const folderPath = path.join(commandsRoot, folder);
     const commandFiles = fs.readdirSync(folderPath, { withFileTypes: true })
-      .filter(f => f.isFile() && f.name.endsWith(".js"))
+      .filter(f => f.isFile() && f.name.endsWith('.js'))
       .map(f => f.name);
 
     for (const fileName of commandFiles) {
@@ -34,20 +39,16 @@ async function loadMessageCommands(client, color) {
         continue;
       }
 
-      if (!command?.data?.name) continue;
+      if (!command?.name || !command?.execute) {
+        continue;
+      }
 
-      client.messageCommands.set(command.data.name, command);
-      publicCommandsArray.push(command.data.toJSON());
+      client.messageCommands.set(command.name, command);
       loadedCount++;
     }
   }
 
-  try {
-    await client.application.commands.set(publicCommandsArray);
-    console.log(`[GLOBAL COMMANDS] Loaded ${loadedCount} message commands successfully`);
-  } catch (err) {
-    console.error("[GLOBAL COMMANDS] Failed to register message commands", err);
-  }
+  console.log(`[MESSAGE COMMANDS] Loaded ${loadedCount} prefix commands`);
 }
 
 module.exports = { loadMessageCommands };

@@ -30,13 +30,16 @@
       "anonymous": "always",
       "named": "never",
       "asyncArrow": "always"
-    }]
+    }],
+    "no-debugger": "warn",
+    "no-alert": "warn"
   },
   "ignorePatterns": [
     "node_modules/",
     "*.log",
     "coverage/",
     "dist/",
-    "build/"
+    "build/",
+    "prisma/"
   ]
 }

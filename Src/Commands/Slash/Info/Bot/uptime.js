@@ -22,24 +22,32 @@ module.exports = {
 
     const uptimeSeconds = process.uptime();
     const startTime = new Date(Date.now() - uptimeSeconds * 1000);
-    
+
     const formatUptime = (seconds) => {
       const d = Math.floor(seconds / 86400);
       const h = Math.floor((seconds % 86400) / 3600);
       const m = Math.floor((seconds % 3600) / 60);
       const s = Math.floor(seconds % 60);
-      
+
       const parts = [];
-      if (d > 0) parts.push(`${d} day${d !== 1 ? 's' : ''}`);
-      if (h > 0) parts.push(`${h} hour${h !== 1 ? 's' : ''}`);
-      if (m > 0) parts.push(`${m} minute${m !== 1 ? 's' : ''}`);
-      if (s > 0 || parts.length === 0) parts.push(`${s} second${s !== 1 ? 's' : ''}`);
-      
+      if (d > 0) {
+        parts.push(`${d} day${d !== 1 ? 's' : ''}`);
+      }
+      if (h > 0) {
+        parts.push(`${h} hour${h !== 1 ? 's' : ''}`);
+      }
+      if (m > 0) {
+        parts.push(`${m} minute${m !== 1 ? 's' : ''}`);
+      }
+      if (s > 0 || parts.length === 0) {
+        parts.push(`${s} second${s !== 1 ? 's' : ''}`);
+      }
+
       return parts.join(', ');
     };
 
     const uptimeFormatted = formatUptime(uptimeSeconds);
-    
+
     const embed = new EmbedBuilder()
       .setTitle('⏱️ **Bot Uptime**')
       .setColor(0x00C2FF)
@@ -52,7 +60,7 @@ module.exports = {
         },
         {
           name: '🔄 **Current Status**',
-          value: `✅ **Online & Operational**\n🟢 **Active**`,
+          value: '✅ **Online & Operational**\n🟢 **Active**',
           inline: true
         },
         {
@@ -61,7 +69,7 @@ module.exports = {
           inline: true
         }
       )
-      .setFooter({ 
+      .setFooter({
         text: 'Keeping your server awesome 24/7!',
         iconURL: client.user.displayAvatarURL()
       })

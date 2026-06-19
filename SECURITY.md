@@ -316,6 +316,6 @@ We will:
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: June 2026
 
 **Questions?** Open an issue or discussion on GitHub.

@@ -8,7 +8,7 @@ module.exports = {
   cooldown: 15,
   devOnly: false,
   guildOnly: true,
-  
+
   voiceOnly: false,
   nsfwOnly: false,
   toggleOffCmd: false,
@@ -75,15 +75,17 @@ module.exports = {
         { name: '👑 Server Info', value: `Owner: <@${guild.ownerId}>\nVerification: **${guild.verificationLevel}**\nLocale: \`${guild.preferredLocale}\``, inline: true },
         { name: '📅 Dates', value: `Created: <t:${Math.floor(guild.createdTimestamp/1000)}:D>\nYou Joined: <t:${Math.floor(interaction.member.joinedTimestamp/1000)}:D>`, inline: true }
       )
-      .setFooter({ 
+      .setFooter({
         text: `Server ID: ${guild.id} • Requested by ${interaction.user.tag}`,
         iconURL: interaction.user.displayAvatarURL({ dynamic: true })
       })
       .setTimestamp();
 
-    
+
     const banner = guild.bannerURL({ size: 1024 });
-    if (banner) embed.setImage(banner);
+    if (banner) {
+      embed.setImage(banner);
+    }
 
     return interaction.editReply({ embeds: [embed] });
   }

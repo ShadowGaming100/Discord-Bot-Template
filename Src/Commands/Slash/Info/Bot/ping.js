@@ -19,15 +19,15 @@ module.exports = {
 
   async execute(client, interaction) {
     const sent = await interaction.deferReply({ withResponse: true });
-    
+
     const botPing = client.ws.ping;
     const apiPing = sent.createdTimestamp - interaction.createdTimestamp;
     const totalPing = botPing + apiPing;
-    
+
     // Determine status based on ping
     let status = '🟢 Excellent';
     let statusColor = 0x00FF00;
-    
+
     if (totalPing > 200) {
       status = '🟡 Good';
       statusColor = 0xFFFF00;
@@ -40,7 +40,7 @@ module.exports = {
       status = '🔴 Poor';
       statusColor = 0xFF0000;
     }
-    
+
     const embed = new EmbedBuilder()
       .setTitle('🏓 **Bot Ping & Latency**')
       .setColor(statusColor)
@@ -76,7 +76,7 @@ module.exports = {
           inline: false
         }
       )
-      .setFooter({ 
+      .setFooter({
         text: 'Lower is better! • Last updated',
         iconURL: client.user.displayAvatarURL()
       })

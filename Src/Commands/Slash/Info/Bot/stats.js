@@ -75,20 +75,20 @@ module.exports = {
           inline: true
         }
       )
-      .setFooter({ 
+      .setFooter({
         text: 'Always improving your server experience',
         iconURL: client.user.displayAvatarURL()
       })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
-    
+
     // Update with actual API latency
     const msg = await interaction.withResponse();
     const apiLatency = msg.createdTimestamp - interaction.createdTimestamp;
-    
+
     embed.data.fields[4].value = `**WebSocket:** ${client.ws.ping}ms\n**API Latency:** ${apiLatency}ms`;
-    
+
     await interaction.editReply({ embeds: [embed] });
   }
 };

@@ -1,44 +1,20 @@
-const { ActivityType, EmbedBuilder } = require("discord.js");
-const fs = require("fs").promises;
-const path = require("path");
-const { logger } = require("../../Functions/logger");
-const { formatUptime, formatBytes } = require("../../Functions/format-utils");
-const colors = require("colors");
-
-// Cache for performance
-const settingsCache = {};
+const { ActivityType, EmbedBuilder } = require('discord.js');
+const { logger } = require('../../Functions/logger');
+const { formatUptime, formatBytes } = require('../../Functions/format-utils');
+const config = require('../../../config');
 
 module.exports = {
-  name: "clientReady",
+  name: 'clientReady',
   once: true,
 
   async execute(client) {
     try {
-      // Load settings with caching
-      if (!settingsCache.loaded) {
-        const SETTINGS_PATH = path.resolve(
-          process.cwd(),
-          "Src/Settings/settings.json"
-        );
-        try {
-          const data = await fs.readFile(SETTINGS_PATH, "utf8");
-          const settings = JSON.parse(data);
-
-          // Normalize keys to lowercase
-          Object.keys(settings).forEach((key) => {
-            settings[key.toLowerCase()] = settings[key];
-          });
-
-          settingsCache.data = settings;
-          settingsCache.loaded = true;
-        } catch (err) {
-          console.error("Failed to load settings:", err.message);
-          settingsCache.data = {};
-          settingsCache.loaded = true;
-        }
-      }
-
-      const settings = settingsCache.data;
+      // Use config system for settings (no direct file reads)
+      const settings = {
+        statuses: config.get('settings.statuses', []),
+        statusrotationintervalms: config.get('settings.statusrotationintervalms', 30000),
+        developer: config.get('settings.developer', {})
+      };
 
       // Display professional console banner
       this.displayConsoleBanner(client);
@@ -49,10 +25,10 @@ module.exports = {
       // Send ready embed to Discord
       setTimeout(() => this.sendReadyEmbed(client), 2000);
     } catch (err) {
-      console.error("ClientReady error:", err);
+      console.error('ClientReady error:', err);
 
       const errorEmbed = new EmbedBuilder()
-        .setTitle("❌ Client Ready Error")
+        .setTitle('Client Ready Error')
         .setDescription(`\`\`\`${err.message}\`\`\``)
         .setColor(0xff0000)
         .setTimestamp();
@@ -70,49 +46,49 @@ module.exports = {
     const totalUsers = guilds.reduce((acc, g) => acc + (g.memberCount || 0), 0);
     const commandCount = client.slashCommands?.size || 0;
 
-    console.log("\n");
-    console.log(colors.cyan("╔════════════════════════════════════════════════════════════════╗"));
-    console.log(colors.cyan("║") + colors.white.bold("                                                                ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.green.bold("   ██████╗ ██╗███████╗ ██████╗ ██████╗ ██████╗ ██████╗        ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.green.bold("   ██╔══██╗██║██╔════╝██╔════╝██╔═══██╗██╔══██╗██╔══██╗       ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.green.bold("   ██║  ██║██║███████╗██║     ██║   ██║██████╔╝██║  ██║       ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.green.bold("   ██║  ██║██║╚════██║██║     ██║   ██║██╔══██╗██║  ██║       ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.green.bold("   ██████╔╝██║███████║╚██████╗╚██████╔╝██║  ██║██████╔╝       ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.green.bold("   ╚═════╝ ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝        ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.yellow.bold("                      BOT TEMPLATE                              ") + colors.cyan("║"));
-    console.log(colors.cyan("║") + colors.white.bold("                                                                ") + colors.cyan("║"));
-    console.log(colors.cyan("╚════════════════════════════════════════════════════════════════╝"));
-    console.log("\n");
+    console.log('\n');
+    console.log('+==================================================================+');
+    console.log('|                                                                  |');
+    console.log('|   ██████╗ ██╗███████╗ ██████╗ ██████╗ ██████╗ ██████╗          |');
+    console.log('|   ██╔══██╗██║██╔════╝██╔════╝██╔═══██╗██╔══██╗██╔══██╗         |');
+    console.log('|   ██║  ██║██║███████╗██║     ██║   ██║██████╔╝██║  ██║         |');
+    console.log('|   ██║  ██║██║╚════██║██║     ██║   ██║██╔══██╗██║  ██║         |');
+    console.log('|   ██████╔╝██║███████║╚██████╗╚██████╔╝██║  ██║██████╔╝         |');
+    console.log('|   ╚═════╝ ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝          |');
+    console.log('|                      BOT TEMPLATE                                |');
+    console.log('|                                                                  |');
+    console.log('+==================================================================+');
+    console.log('\n');
 
     // Bot Information
-    console.log(colors.cyan.bold("📊 Bot Information"));
-    console.log(colors.gray("━".repeat(64)));
-    console.log(colors.white("  Username:       ") + colors.green.bold(client.user.tag));
-    console.log(colors.white("  ID:             ") + colors.yellow(client.user.id));
-    console.log(colors.white("  Environment:    ") + colors.magenta.bold(process.env.NODE_ENV || "development"));
-    console.log("\n");
+    console.log('Bot Information');
+    console.log('-'.repeat(64));
+    console.log('  Username:       ' + client.user.tag);
+    console.log('  ID:             ' + client.user.id);
+    console.log('  Environment:    ' + (process.env.NODE_ENV || 'development'));
+    console.log('\n');
 
     // Statistics
-    console.log(colors.cyan.bold("📈 Statistics"));
-    console.log(colors.gray("━".repeat(64)));
-    console.log(colors.white("  Guilds:         ") + colors.green.bold(totalGuilds.toString()));
-    console.log(colors.white("  Users:          ") + colors.green.bold(totalUsers.toLocaleString()));
-    console.log(colors.white("  Commands:       ") + colors.green.bold(commandCount.toString()));
-    console.log(colors.white("  Ping:           ") + colors.yellow.bold(`${client.ws.ping}ms`));
-    console.log("\n");
+    console.log('Statistics');
+    console.log('-'.repeat(64));
+    console.log('  Guilds:         ' + totalGuilds.toString());
+    console.log('  Users:          ' + totalUsers.toLocaleString());
+    console.log('  Commands:       ' + commandCount.toString());
+    console.log('  Ping:           ' + `${client.ws.ping}ms`);
+    console.log('\n');
 
     // System Information
-    console.log(colors.cyan.bold("💻 System Information"));
-    console.log(colors.gray("━".repeat(64)));
-    console.log(colors.white("  Node.js:        ") + colors.blue(process.version));
-    console.log(colors.white("  Memory Usage:   ") + colors.yellow(formatBytes(process.memoryUsage().rss)));
-    console.log(colors.white("  Platform:       ") + colors.blue(`${process.platform} ${process.arch}`));
-    console.log(colors.white("  Uptime:         ") + colors.green(formatUptime(process.uptime())));
-    console.log("\n");
+    console.log('System Information');
+    console.log('-'.repeat(64));
+    console.log('  Node.js:        ' + process.version);
+    console.log('  Memory Usage:   ' + formatBytes(process.memoryUsage().rss));
+    console.log('  Platform:       ' + `${process.platform} ${process.arch}`);
+    console.log('  Uptime:         ' + formatUptime(process.uptime()));
+    console.log('\n');
 
-    console.log(colors.green.bold("✅ Bot is now online and ready!"));
-    console.log(colors.gray("━".repeat(64)));
-    console.log("\n");
+    console.log('Bot is now online and ready!');
+    console.log('-'.repeat(64));
+    console.log('\n');
   },
 
   async setupStatusRotation(client, settings) {
@@ -123,7 +99,7 @@ module.exports = {
       Playing: ActivityType.Playing,
       Watching: ActivityType.Watching,
       Listening: ActivityType.Listening,
-      Competing: ActivityType.Competing,
+      Competing: ActivityType.Competing
     };
 
     let statuses = [];
@@ -131,9 +107,9 @@ module.exports = {
       statuses = settings.statuses.map((s) => ({
         text: s.text,
         type: activityTypeMap[s.type] || ActivityType.Playing,
-        status: ["online", "idle", "dnd", "invisible"].includes(s.status)
+        status: ['online', 'idle', 'dnd', 'invisible'].includes(s.status)
           ? s.status
-          : "online",
+          : 'online'
       }));
     }
 
@@ -156,10 +132,10 @@ module.exports = {
         ),
         uptime: formatUptime(process.uptime()),
         memory: formatBytes(process.memoryUsage().heapUsed),
-        version: require("../../../package.json").version,
+        version: require('../../../package.json').version,
         shards: client.shard ? client.shard.count : 1,
         devs: settings.developer?.ids?.length || 0,
-        bot: client.user.tag,
+        bot: client.user.tag
       };
 
       const renderedText = String(status.text).replace(
@@ -175,10 +151,10 @@ module.exports = {
       try {
         client.user.setPresence({
           activities: [{ name: renderedText, type: status.type }],
-          status: status.status,
+          status: status.status
         });
       } catch (err) {
-        console.error("Failed to set presence:", err);
+        console.error('Failed to set presence:', err);
       }
 
       index = (index + 1) % statuses.length;
@@ -205,11 +181,11 @@ module.exports = {
       const commandCount = client.slashCommands?.size || 0;
       const eventCount = client.events?.size || 0;
       const nodeVersion = process.version;
-      const environment = process.env.NODE_ENV || "development";
+      const environment = process.env.NODE_ENV || 'development';
 
       const embed = new EmbedBuilder()
         .setAuthor({
-          name: "🚀 Bot Successfully Started",
+          name: '🚀 Bot Successfully Started',
           iconURL: client.user.displayAvatarURL()
         })
         .setDescription(
@@ -220,43 +196,43 @@ module.exports = {
         .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
         .addFields(
           {
-            name: "📊 Server Statistics",
-            value: 
-              `\`\`\`yml\n` +
+            name: '📊 Server Statistics',
+            value:
+              '```yml\n' +
               `Guilds:   ${totalGuilds.toLocaleString()}\n` +
               `Users:    ${totalUsers.toLocaleString()}\n` +
               `Channels: ${client.channels.cache.size.toLocaleString()}\n` +
-              `\`\`\``,
+              '```',
             inline: true
           },
           {
-            name: "⚙️ Bot Configuration",
+            name: '⚙️ Bot Configuration',
             value:
-              `\`\`\`yml\n` +
+              '```yml\n' +
               `Commands: ${commandCount}\n` +
               `Events:   ${eventCount}\n` +
               `Shards:   ${client.shard?.count || 1}\n` +
-              `\`\`\``,
+              '```',
             inline: true
           },
           {
-            name: "💻 System Resources",
+            name: '💻 System Resources',
             value:
-              `\`\`\`yml\n` +
+              '```yml\n' +
               `Memory:   ${formatBytes(process.memoryUsage().rss)}\n` +
               `Node.js:  ${nodeVersion}\n` +
               `Platform: ${process.platform}\n` +
-              `\`\`\``,
+              '```',
             inline: true
           },
           {
-            name: "🌐 Connection Details",
+            name: '🌐 Connection Details',
             value:
-              `\`\`\`yml\n` +
+              '```yml\n' +
               `WebSocket Ping: ${client.ws.ping}ms\n` +
               `Ready Since:    ${new Date().toLocaleTimeString()}\n` +
               `Uptime:         ${formatUptime(process.uptime())}\n` +
-              `\`\`\``,
+              '```',
             inline: false
           }
         )
@@ -268,7 +244,7 @@ module.exports = {
 
       await logger.client({ client, embed });
     } catch (err) {
-      console.error("Failed to send ready embed:", err.message);
+      console.error('Failed to send ready embed:', err.message);
     }
   }
 };

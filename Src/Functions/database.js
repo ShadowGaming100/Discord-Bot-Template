@@ -687,11 +687,6 @@ class DatabaseManager {
 // Create singleton instance
 const db = new DatabaseManager();
 
-// Auto-initialize
-if (process.env.DB_AUTO_INIT !== 'false') {
-  db.initialize().catch(console.error);
-}
-
 // Graceful shutdown
 process.on('SIGTERM', () => db.closePool());
 process.on('SIGINT', () => db.closePool());
@@ -707,6 +702,7 @@ module.exports = {
   getNextTypeId: (baseType) => db.getNextTypeId(baseType),
   closePool: () => db.closePool(),
   isReady: () => db.isReady(),
+  initialize: () => db.initialize(),
 
   buildConditions: (...args) => db._buildConditions(...args),
   instance: db

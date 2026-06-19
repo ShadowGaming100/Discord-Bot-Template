@@ -39,7 +39,7 @@ module.exports = {
         .setTitle(`🎭 Roles in ${guild.name}`)
         .setColor(Colors.Blurple)
         .setDescription(pages[page])
-        .setFooter({ 
+        .setFooter({
           text: `Page ${page + 1}/${pages.length} • Requested by ${interaction.user.tag}`,
           iconURL: interaction.user.displayAvatarURL({ dynamic: true })
         })
@@ -82,8 +82,12 @@ module.exports = {
     collector.on('collect', async i => {
       switch(i.customId) {
         case 'first': page = 0; break;
-        case 'prev': if (page > 0) page--; break;
-        case 'next': if (page < pages.length - 1) page++; break;
+        case 'prev': if (page > 0) {
+          page--;
+        } break;
+        case 'next': if (page < pages.length - 1) {
+          page++;
+        } break;
         case 'last': page = pages.length - 1; break;
       }
 

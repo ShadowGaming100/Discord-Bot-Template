@@ -30,7 +30,9 @@ function sanitizeErrorMessage(error, isDevelopment = false) {
  * @returns {object} - Sanitized data safe for logging
  */
 function sanitizeForLogging(data) {
-  if (!data || typeof data !== 'object') return data;
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
 
   const sensitiveKeys = [
     'token',
@@ -46,16 +48,18 @@ function sanitizeForLogging(data) {
   const sanitized = Array.isArray(data) ? [...data] : { ...data };
 
   function recursiveSanitize(obj) {
-    if (!obj || typeof obj !== 'object') return obj;
+    if (!obj || typeof obj !== 'object') {
+      return obj;
+    }
 
     const result = Array.isArray(obj) ? [] : {};
 
     for (const [key, value] of Object.entries(obj)) {
       const lowerKey = String(key).toLowerCase();
-      
+
       // Check if this is a sensitive key
       const isSensitive = sensitiveKeys.some(sk => lowerKey.includes(sk));
-      
+
       if (isSensitive) {
         result[key] = '[REDACTED]';
       } else if (value && typeof value === 'object') {
@@ -164,8 +168,10 @@ function verifyPermissionLevel(userId, allowedIds, level = 'required') {
  * @returns {string} - Escaped text
  */
 function escapeMarkdown(text) {
-  if (typeof text !== 'string') return String(text);
-  
+  if (typeof text !== 'string') {
+    return String(text);
+  }
+
   return text
     .replace(/\\/g, '\\\\')
     .replace(/\*/g, '\\*')

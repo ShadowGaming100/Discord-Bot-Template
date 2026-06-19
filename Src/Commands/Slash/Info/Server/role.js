@@ -8,7 +8,7 @@ module.exports = {
   cooldown: 10,
   devOnly: false,
   guildOnly: true,
-  
+
   voiceOnly: false,
   nsfwOnly: false,
   toggleOffCmd: false,
