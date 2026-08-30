@@ -1,12 +1,10 @@
 require('dotenv').config();
-const { Collection, Client, EmbedBuilder } = require('discord.js');
+const { Collection, Client } = require('discord.js');
 const { loadSlashCommands } = require('./Src/Handlers/slashCommands');
 const { loadMessageCommands } = require('./Src/Handlers/messageCommands');
 const { loadEvents } = require('./Src/Handlers/events');
 const { loadAntiCrash } = require('./Src/Handlers/antiCrash');
 const clientSettingsObject = require('./Src/Functions/clientSettingsObject');
-const { logger } = require('./Src/Functions/logger');
-const { formatUptime, formatBytes } = require('./Src/Functions/format-utils');
 const settings = require('./Src/Settings/settings.json');
 
 async function initializeDatabase() {
@@ -63,53 +61,10 @@ async function initializeBot() {
 }
 
 async function setupShutdownHandlers(client) {
-  const botStartTimestamp = Date.now();
   const shutdown = async (signal) => {
     console.log(`⚡ Shutdown signal received: ${signal}`);
     if (client?.user) {
-      const embed = new EmbedBuilder()
-        .setAuthor({ name: '🛑 Bot Shutdown', iconURL: client.user.displayAvatarURL() })
-        .setDescription(`**${client.user.tag}** shutting down (${signal})`)
-        .setColor(0xffa500)
-        .addFields(
-          {
-            name: '📊 Servers',
-            value:
-              '```yml\nGuilds: ' +
-              client.guilds.cache.size.toLocaleString() +
-              '\nUsers: ' +
-              client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0).toLocaleString() +
-              '\n```',
-            inline: true
-          },
-          {
-            name: '⏱️ Uptime',
-            value:
-              '```yml\n' +
-              formatUptime((Date.now() - botStartTimestamp) / 1000) +
-              '\n' +
-              new Date().toLocaleTimeString() +
-              '\n```',
-            inline: true
-          },
-          {
-            name: '💻 System',
-            value:
-              '```yml\n' +
-              formatBytes(process.memoryUsage().rss) +
-              ' • ' +
-              process.version +
-              '\n```',
-            inline: true
-          }
-        )
-        .setFooter({ text: `Bot ID: ${client.user.id}`, iconURL: client.user.displayAvatarURL() })
-        .setTimestamp();
-      try {
-        await logger.client({ client, embed });
-      } catch (e) {
-        console.error('Failed to send shutdown log:', e);
-      }
+      console.log(`Shutting down ${client.user.tag} — ${client.guilds.cache.size} guilds`);
     }
     try {
       await require('./Src/Functions/database').closePool();

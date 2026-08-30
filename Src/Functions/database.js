@@ -97,6 +97,5 @@ module.exports = {
   closePool: () => db.closePool(),
   isReady: () => db.isReady(),
   initialize: () => db.initialize(),
-  getClient: () => db.getClient(),
-  instance: db
+  getClient: () => db.getClient()
 };

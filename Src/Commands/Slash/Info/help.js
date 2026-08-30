@@ -152,9 +152,9 @@ module.exports = {
     collector.on('end', () => interaction.editReply({ components: [] }).catch(() => {}));
   },
   getCategoryEmoji(c) {
-    return { Economy: '💰', Moderation: '🛡️', Fun: '🎮', Utility: '🔧', Music: '🎵', Info: 'ℹ️', Admin: '⚙️', Social: '👥', Leveling: '📊', Games: '🎲', Configuration: '🔩', Tickets: '🎫', Logs: '📝', Welcome: '👋', Giveaway: '🎁', Reaction: '⭐', Verification: '✅', Automod: '🤖', Custom: '🎨', Developer: '👨‍💻', Owner: '👑' }[c] || '📁';
+    return { Info: 'ℹ️', Config: '🔧' }[c] || '📁';
   },
   getSubgroupEmoji(s) {
-    return { General: '📌', Profile: '👤', Shop: '🛒', Work: '💼', Inventory: '🎒', Games: '🎮', Casino: '🎰', Fishing: '🎣', Hunting: '🏹', Mining: '⛏️', Farming: '🌾', Trading: '🔄', Leaderboard: '🏆', Settings: '⚙️', Management: '📋', Moderation: '🔨', Tickets: '🎫', Logs: '📜', Filter: '🔍', Auto: '🤖', Music: '🎵', Queue: '📜', Playlist: '📋', Fun: '😄', Image: '🖼️', Memes: '😂', Anime: '🎌', Search: '🔎', Info: '📖', User: '👥', Server: '🏠', Role: '🎭', Channel: '💬', Emoji: '😀', Stats: '📊', Level: '⬆️', Rank: '🏅', Rewards: '🎁', Config: '🔧', Setup: '🛠️', Reset: '🔄', Import: '📥', Export: '📤' }[s] || '▸';
+    return { General: '📌', Bot: '🤖', Server: '🏠', User: '👥', Config: '🔧' }[s] || '▸';
   }
 };

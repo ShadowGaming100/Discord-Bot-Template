@@ -1,24 +1,14 @@
 const { EmbedBuilder, WebhookClient } = require('discord.js');
 const { sanitizeForLogging } = require('./security-utils');
-const logsJson = require('../Settings/logs.json');
 
 const WEBHOOK_ENV = {
   error: 'LOGS_ERRORLOGS_WEBHOOK',
-  command: 'LOGS_COMMANDLOGS_WEBHOOK',
-  guild: 'LOGS_GUILDLOGS_WEBHOOK',
-  shard: 'LOGS_SHARDLOGS_WEBHOOK',
-  client: 'LOGS_CLIENTLOGS_WEBHOOK',
-  ban: 'LOGS_BANLOGS_WEBHOOK',
-  server: 'LOGS_SERVERLOGS_WEBHOOK'
+  command: 'LOGS_COMMANDLOGS_WEBHOOK'
 };
 
 function getLogConfig(type) {
-  const base = logsJson[`${type}Logs`] || {};
   const webhook = process.env[WEBHOOK_ENV[type]] || '';
-  if (!webhook) {
-    return { enabled: base.enabled !== false, webhook: '' };
-  }
-  return { enabled: base.enabled !== false, webhook };
+  return { enabled: true, webhook };
 }
 
 class DiscordLogger {
@@ -52,9 +42,6 @@ class DiscordLogger {
   }
   async send({ type = 'error', title, description, fields, embed, error }) {
     const cfg = getLogConfig(type);
-    if (!cfg.enabled) {
-      return false;
-    }
     if (!cfg.webhook) {
       console.warn(`[Logger:${type}] webhook not set — skipping Discord log`);
       return false;
@@ -85,17 +72,8 @@ class DiscordLogger {
   command(opts) {
     return this.send({ ...opts, type: 'command' });
   }
-  guild(opts) {
-    return this.send({ ...opts, type: 'guild' });
-  }
   client(opts) {
     return this.send({ ...opts, type: 'client' });
-  }
-  ban(opts) {
-    return this.send({ ...opts, type: 'ban' });
-  }
-  server(opts) {
-    return this.send({ ...opts, type: 'server' });
   }
 }
 

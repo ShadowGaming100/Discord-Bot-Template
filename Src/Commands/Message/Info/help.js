@@ -44,12 +44,6 @@ module.exports = {
       if (cmd.botPermissions?.length) {
         embed.addFields({ name: '🤖 Required Bot Permissions', value: cmd.botPermissions.map(p => `\`${p}\``).join(', '), inline: false });
       }
-      if (cmd.guildIds) {
-        const gids = Array.isArray(cmd.guildIds) ? cmd.guildIds : [];
-        if (gids.length) {
-          embed.addFields({ name: '🏠 Allowed Guilds', value: gids.join(', '), inline: false });
-        }
-      }
 
       return message.reply({ embeds: [embed] });
     }

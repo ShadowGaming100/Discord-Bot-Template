@@ -1,9 +1,0 @@
-{
-  "errorLogs": { "enabled": true },
-  "commandLogs": { "enabled": true },
-  "guildLogs": { "enabled": true },
-  "shardLogs": { "enabled": true },
-  "clientLogs": { "enabled": true },
-  "banLogs": { "enabled": true },
-  "serverLogs": { "enabled": true }
-}
