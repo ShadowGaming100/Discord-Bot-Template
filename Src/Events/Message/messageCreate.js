@@ -1,6 +1,6 @@
 const { Collection, PermissionsBitField } = require('discord.js');
 const { getPermissionLabel, DEFAULT_BOT_PERMISSIONS, DEFAULT_USER_PERMISSIONS } = require('../../Functions/permissions');
-const settings = require('../../../Settings/settings.json');
+const settings = require('../../Settings/settings.json');
 
 const prefixCache = new Map();
 

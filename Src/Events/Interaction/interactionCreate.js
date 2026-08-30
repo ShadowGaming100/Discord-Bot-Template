@@ -1,7 +1,7 @@
 const { Collection, MessageFlags, PermissionsBitField, InteractionType, EmbedBuilder } = require('discord.js');
 const { getPermissionLabel, DEFAULT_BOT_PERMISSIONS, DEFAULT_USER_PERMISSIONS } = require('../../Functions/permissions');
 const { logger } = require('../../Functions/logger');
-const settings = require('../../../Settings/settings.json');
+const settings = require('../../Settings/settings.json');
 
 module.exports = {
   name: 'interactionCreate',

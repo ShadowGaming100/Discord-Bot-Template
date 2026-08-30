@@ -1,5 +1,7 @@
-function sanitizeErrorMessage() {
-  return 'An error occurred. Please try again later.';
+function sanitizeErrorMessage(error) {
+  if (!error) return 'An unknown error occurred';
+  const msg = error.message || String(error);
+  return msg.replace(/\b(password|secret|token|apikey|api_key|authorization)=[^\s&]+/gi, '$1=[REDACTED]');
 }
 
 function sanitizeForLogging(data) {

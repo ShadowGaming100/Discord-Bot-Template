@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const settings = require('../../../../Settings/settings.json');
+const settings = require('../../../Settings/settings.json');
 
 module.exports = {
   name: 'help',

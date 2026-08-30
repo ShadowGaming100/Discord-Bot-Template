@@ -58,6 +58,8 @@ npx prisma generate
 ```
 Single table `guild_settings` (`guildId`, `prefix`). No `tableSchemas.js` — schema is `prisma/schema.prisma` only.
 
+> **Note:** This project uses Prisma 7 which requires `@prisma/adapter-pg` and `pg` for PostgreSQL connections. These are installed automatically via `npm install`.
+
 ### 5. Start
 ```bash
 npm run dev   # node index.js
@@ -79,7 +81,7 @@ Discord-Bot-Template/
 │   │   ├── Interaction/interactionCreate.js
 │   │   └── Message/messageCreate.js # prefix + guildIds + perms + cooldown
 │   ├── Functions/
-│   │   ├── database.js     # Prisma only (DATABASE_URL)
+│   │   ├── database.js     # Prisma + @prisma/adapter-pg (DATABASE_URL)
 │   │   ├── logger.js       # Webhook-only, 3 types (error/command/client)
 │   │   ├── permissions.js  # 52 labels + DEFAULT_* 
 │   │   ├── security-utils.js # sanitizeErrorMessage (always generic) + sanitizeForLogging
@@ -180,6 +182,8 @@ Single table `guild_settings` (`guildId`, `prefix`). Prefix flow: `messageCreate
 
 Env: `DATABASE_URL` only — see Environment Variables.
 
+Uses Prisma 7 with `@prisma/adapter-pg` adapter (configured in `Src/Functions/database.js`).
+
 
 ## Environment Variables (secrets only)
 
@@ -216,7 +220,7 @@ npm run format  # prettier
 
 **Commands not showing** — Global register 1h cache, re-invite with `bot + applications.commands` scope.
 
-**Database errors** — Verify `DATABASE_URL` for Prisma, `npx prisma db push`.
+**Database errors** — Verify `DATABASE_URL` for Prisma, `npx prisma db push`. If you see "Unknown property datasourceUrl" or "requires adapter", you're on Prisma 7 — ensure `@prisma/adapter-pg` and `pg` are installed (`npm install @prisma/adapter-pg pg`).
 
 **Prefix not changing** — Need `Manage Server` perm, DB must be up (`!prefix` without arg shows current).
 

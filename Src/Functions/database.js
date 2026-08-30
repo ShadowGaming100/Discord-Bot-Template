@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
 const { sanitizeErrorMessage } = require('./security-utils');
 
 class DatabaseManager {
@@ -17,7 +18,8 @@ class DatabaseManager {
       return;
     }
     try {
-      this.prisma = new PrismaClient();
+      const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+      this.prisma = new PrismaClient({ adapter });
       await this.prisma.$connect();
       this.isAvailable = true;
       console.log('✅ PostgreSQL connected (Prisma)');

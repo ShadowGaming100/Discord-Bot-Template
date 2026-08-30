@@ -1,7 +1,7 @@
 const { ActivityType, EmbedBuilder } = require('discord.js');
 const { logger } = require('../../Functions/logger');
 const { formatUptime, formatBytes } = require('../../Functions/format-utils');
-const settings = require('../../../Settings/settings.json');
+const settings = require('../../Settings/settings.json');
 
 module.exports = {
   name: 'clientReady',
@@ -40,7 +40,7 @@ module.exports = {
         return;
       }
       const s = statuses[i];
-      const map = { guilds: String(client.guilds.cache.size), users: String(client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0)), uptime: formatUptime(process.uptime()), memory: formatBytes(process.memoryUsage().heapUsed), version: require('../../../../package.json').version, bot: client.user.tag };
+      const map = { guilds: String(client.guilds.cache.size), users: String(client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0)), uptime: formatUptime(process.uptime()), memory: formatBytes(process.memoryUsage().heapUsed), version: require('../../../package.json').version, bot: client.user.tag };
       const text = String(s.text).replace(/{([^}]+)}/g, (_, k) => map[k] ?? `{${k}}`);
       try {
         client.user.setPresence({ activities: [{ name: text, type: s.type }], status: s.status });
