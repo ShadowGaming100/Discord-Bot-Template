@@ -8,9 +8,8 @@ const clientSettingsObject = require('./Src/Functions/clientSettingsObject');
 const settings = require('./Src/Settings/settings.json');
 
 async function initializeDatabase() {
-  const pgHost = process.env.SERVER_POSTGRES_HOST || '';
-  if (!pgHost) {
-    console.log('Database not configured, skipping initialization');
+  if (!process.env.DATABASE_URL) {
+    console.log('Database not configured (DATABASE_URL missing), skipping initialization');
     return;
   }
   try {

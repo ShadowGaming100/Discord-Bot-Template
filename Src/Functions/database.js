@@ -2,26 +2,13 @@ require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const { sanitizeErrorMessage } = require('./security-utils');
 
-function getPostgresConfig() {
-  return {
-    host: process.env.SERVER_POSTGRES_HOST || '',
-    port: Number(process.env.SERVER_POSTGRES_PORT || 5432),
-    user: process.env.SERVER_POSTGRES_USER || '',
-    password: process.env.SERVER_POSTGRES_PASSWORD || '',
-    database: process.env.SERVER_POSTGRES_DATABASE || '',
-    ssl: process.env.SERVER_POSTGRES_SSL === 'true',
-    noVerifySSL: process.env.SERVER_POSTGRES_NOVERIFYSSL === 'true'
-  };
-}
-
 class DatabaseManager {
   constructor() {
     this.prisma = null;
     this.isAvailable = false;
     this.initialized = false;
-    const pgConfig = getPostgresConfig();
-    if (!pgConfig.host || !pgConfig.database || !pgConfig.user) {
-      console.warn('⚠️ Database configuration incomplete (set SERVER_POSTGRES_* in .env). Some features may not work.');
+    if (!process.env.DATABASE_URL) {
+      console.warn('⚠️ DATABASE_URL not set in .env — DB features disabled.');
     }
   }
 
@@ -30,10 +17,7 @@ class DatabaseManager {
       return;
     }
     try {
-      this.prisma = new PrismaClient({
-        log: process.env.DB_DEBUG === 'true' ? ['query', 'info', 'warn', 'error'] : ['warn', 'error'],
-        datasources: { db: { url: this._buildConnectionString() } }
-      });
+      this.prisma = new PrismaClient();
       await this.prisma.$connect();
       this.isAvailable = true;
       console.log('✅ PostgreSQL connected (Prisma)');
@@ -44,22 +28,6 @@ class DatabaseManager {
       this.isAvailable = false;
       throw new Error(`Database connection failed: ${safeMessage}`);
     }
-  }
-
-  _buildConnectionString() {
-    const pgConfig = getPostgresConfig();
-    const user = encodeURIComponent(pgConfig.user);
-    const password = encodeURIComponent(pgConfig.password || '');
-    const host = pgConfig.host;
-    const port = pgConfig.port || 5432;
-    const database = pgConfig.database;
-    const params = ['application_name=discord-bot'];
-    if (pgConfig.ssl) {
-      params.push('sslmode=require');
-    } else if (pgConfig.noVerifySSL) {
-      params.push('sslmode=require', 'sslaccept=accept_invalid_certs');
-    }
-    return `postgresql://${user}:${password}@${host}:${port}/${database}?${params.join('&')}`;
   }
 
   async ensurePostgresTables() {
