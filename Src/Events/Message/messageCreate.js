@@ -1,4 +1,4 @@
-const { Collection, PermissionsBitField } = require('discord.js');
+const { Collection, PermissionsBitField, EmbedBuilder } = require('discord.js');
 const { getPermissionLabel, DEFAULT_BOT_PERMISSIONS, DEFAULT_USER_PERMISSIONS } = require('../../Functions/permissions');
 const settings = require('../../Settings/settings.json');
 
@@ -44,12 +44,48 @@ module.exports = {
       }
       const guildId = message.guild?.id || null;
       const prefix = await getPrefix(guildId);
-      if (!message.content.startsWith(prefix)) {
+      const botId = client.user.id;
+      const mention = `<@${botId}>`;
+      const mentionNick = `<@!${botId}>`;
+      const trimmed = message.content.trim();
+
+      // Show prefix when bot is pinged alone (no command)
+      if (trimmed === mention || trimmed === mentionNick) {
+        const embed = new EmbedBuilder()
+          .setTitle('👋 Hello!')
+          .setColor(0x5865f2)
+          .setDescription(`My prefix here is \`${prefix}\`\nTry \`${prefix}help\` for commands or \`${prefix}prefix <newPrefix>\` to change it.\nYou can also use ${mention} as prefix — e.g. \`${mention} ping\``)
+          .setFooter({ text: `Guild: ${message.guild?.name || 'DM'}`, iconURL: client.user.displayAvatarURL() })
+          .setTimestamp();
+        try {
+          await message.reply({ embeds: [embed] });
+        } catch {}
         return;
       }
 
-      const withoutPrefix = message.content.slice(prefix.length).trim();
+      // Allow mention as prefix alternative
+      let withoutPrefix = null;
+      if (message.content.startsWith(prefix)) {
+        withoutPrefix = message.content.slice(prefix.length).trim();
+      } else if (message.content.startsWith(mention)) {
+        withoutPrefix = message.content.slice(mention.length).trim();
+      } else if (message.content.startsWith(mentionNick)) {
+        withoutPrefix = message.content.slice(mentionNick.length).trim();
+      } else {
+        return;
+      }
+
       if (!withoutPrefix) {
+        // Prefix/mention alone with no command — show prefix
+        const embed = new EmbedBuilder()
+          .setTitle('🔧 Prefix')
+          .setColor(0x5865f2)
+          .setDescription(`My prefix here is \`${prefix}\`\nUse \`${prefix}help\` or ${mention} for help.`)
+          .setFooter({ text: `Guild ID: ${guildId || 'DM'}`, iconURL: client.user.displayAvatarURL() })
+          .setTimestamp();
+        try {
+          await message.reply({ embeds: [embed] });
+        } catch {}
         return;
       }
 
