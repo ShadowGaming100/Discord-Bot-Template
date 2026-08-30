@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, version: discordVersion } = require('discord.js');
 const os = require('os');
+const { formatUptime } = require('../../../../Functions/format-utils');
 
 module.exports = {
   name: 'stats',
@@ -22,13 +23,6 @@ module.exports = {
     await interaction.deferReply();
 
     const uptimeSeconds = process.uptime();
-    const formatUptime = (seconds) => {
-      const d = Math.floor(seconds / 86400);
-      const h = Math.floor((seconds % 86400) / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      const s = Math.floor(seconds % 60);
-      return `${d}d ${h}h ${m}m ${s}s`;
-    };
 
     const guilds = client.guilds.cache;
     const members = guilds.reduce((acc, guild) => acc + guild.memberCount, 0);
@@ -66,7 +60,7 @@ module.exports = {
         },
         {
           name: '🔗 **Connections**',
-          value: `**WebSocket:** ${client.ws.ping}ms\n**API Latency:** Calculating...`,
+          value: `**WebSocket:** ${client.ws.ping}ms\n**API Latency:** ${Date.now() - interaction.createdTimestamp}ms`,
           inline: true
         },
         {
@@ -80,14 +74,6 @@ module.exports = {
         iconURL: client.user.displayAvatarURL()
       })
       .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
-
-    // Update with actual API latency
-    const msg = await interaction.withResponse();
-    const apiLatency = msg.createdTimestamp - interaction.createdTimestamp;
-
-    embed.data.fields[4].value = `**WebSocket:** ${client.ws.ping}ms\n**API Latency:** ${apiLatency}ms`;
 
     await interaction.editReply({ embeds: [embed] });
   }

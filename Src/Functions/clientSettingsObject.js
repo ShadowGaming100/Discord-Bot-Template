@@ -2,30 +2,13 @@ const { GatewayIntentBits, Partials } = require('discord.js');
 
 function clientSettingsObject() {
   return {
-    allowedMentions: {
-      parse: ['users', 'roles', 'everyone']
-    },
-
+    allowedMentions: { parse: ['users', 'roles'] },
     intents: [
-      GatewayIntentBits.AutoModerationConfiguration,
-      GatewayIntentBits.AutoModerationExecution,
-      GatewayIntentBits.DirectMessageReactions,
-      GatewayIntentBits.DirectMessageTyping,
-      GatewayIntentBits.DirectMessages,
-      GatewayIntentBits.GuildIntegrations,
-      GatewayIntentBits.GuildInvites,
-      GatewayIntentBits.GuildMembers,
-      GatewayIntentBits.GuildMessageReactions,
-      GatewayIntentBits.GuildMessageTyping,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.GuildPresences,
-      GatewayIntentBits.GuildScheduledEvents,
-      GatewayIntentBits.GuildVoiceStates,
-      GatewayIntentBits.GuildWebhooks,
       GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent
     ],
-
     partials: [
       Partials.Channel,
       Partials.GuildMember,

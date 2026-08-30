@@ -18,10 +18,11 @@ module.exports = {
     .setDescription('Check the bot\'s latency and connection status.'),
 
   async execute(client, interaction) {
-    const sent = await interaction.deferReply({ withResponse: true });
+    await interaction.deferReply();
 
     const botPing = client.ws.ping;
-    const apiPing = sent.createdTimestamp - interaction.createdTimestamp;
+    // Round trip from command receipt until Discord confirms our response
+    const apiPing = Date.now() - interaction.createdTimestamp;
     const totalPing = botPing + apiPing;
 
     // Determine status based on ping

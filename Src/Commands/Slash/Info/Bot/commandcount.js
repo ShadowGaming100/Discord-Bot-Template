@@ -20,7 +20,7 @@ module.exports = {
 
     // Group commands by category
     const categories = {};
-    for (const [key, command] of client.slashCommands) {
+    for (const command of client.slashCommands.values()) {
       const category = command.category || 'Uncategorized';
       categories[category] = (categories[category] || 0) + 1;
     }

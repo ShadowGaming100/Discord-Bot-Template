@@ -123,74 +123,51 @@ function extract(mod) {
   return b.toJSON();
 }
 
-/**
-   * Apply command options to a subcommand builder
-   * @param {SubcommandBuilder} builder - The subcommand builder
-   * @param {object} json - The command JSON data
-   * @returns {SubcommandBuilder} The configured builder
-   */
 function applyOptions(builder, json) {
-  builder.setName(json  .name).setDescription(json.description);
-
-  (json.options || []).forEach(o => {
-    switch (o.type) {
-      case 3:
-        builder.addStringOption(opt => {
-          const op = opt.setName(o.name).setDescription(o.description).setRequired(o.required || false);
-          if (o.autocomplete) {
-            op.setAutocomplete(true);
-          }
-          if (o.choices) {
-            o.choices.forEach(c => op.addChoices({ name: c.name, value: c.value }));
-          }
-          return op;
-        });
-        break;
-      case 4:
-        builder.addIntegerOption(opt => {
-          const op = opt.setName(o.name).setDescription(o.description).setRequired(o.required || false);
-          if (o.min_value !== null) {
-            op.setMinValue(o.min_value);
-          }
-          if (o.max_value !== null) {
-            op.setMaxValue(o.max_value);
-          }
-          return op;
-        });
-        break;
-      case 5:
-        builder.addBooleanOption(opt => opt.setName(o.name).setDescription(o.description).setRequired(o.required || false));
-        break;
-      case 6:
-        builder.addUserOption(opt => opt.setName(o.name).setDescription(o.description).setRequired(o.required || false));
-        break;
-      case 7:
-        builder.addChannelOption(opt => opt.setName(o.name).setDescription(o.description).setRequired(o.required || false));
-        break;
-      case 8:
-        builder.addRoleOption(opt => opt.setName(o.name).setDescription(o.description).setRequired(o.required || false));
-        break;
-      case 9:
-        builder.addMentionableOption(opt => opt.setName(o.name).setDescription(o.description).setRequired(o.required || false));
-        break;
-      case 10:
-        builder.addNumberOption(opt => {
-          const op = opt.setName(o.name).setDescription(o.description).setRequired(o.required || false);
-          if (o.min_value !== null) {
-            op.setMinValue(o.min_value);
-          }
-          if (o.max_value !== null) {
-            op.setMaxValue(o.max_value);
-          }
-          return op;
-        });
-        break;
-      case 11:
-        builder.addAttachmentOption(opt => opt.setName(o.name).setDescription(o.description).setRequired(o.required || false));
-        break;
+  builder.setName(json.name).setDescription(json.description);
+  const base = (opt, o) => opt.setName(o.name).setDescription(o.description).setRequired(!!o.required);
+  for (const o of json.options || []) {
+    if (o.type === 3) {
+      builder.addStringOption(opt => {
+        const op = base(opt, o);
+        if (o.autocomplete) {
+          op.setAutocomplete(true);
+        }
+        if (o.choices) {
+          o.choices.forEach(c => op.addChoices({ name: c.name, value: c.value }));
+        }
+        return op;
+      });
+    } else if (o.type === 4) {
+      builder.addIntegerOption(opt => {
+        const op = base(opt, o);
+        if (o.min_value != null) {
+          op.setMinValue(o.min_value);
+        }
+        if (o.max_value != null) {
+          op.setMaxValue(o.max_value);
+        }
+        return op;
+      });
+    } else if (o.type === 10) {
+      builder.addNumberOption(opt => {
+        const op = base(opt, o);
+        if (o.min_value != null) {
+          op.setMinValue(o.min_value);
+        }
+        if (o.max_value != null) {
+          op.setMaxValue(o.max_value);
+        }
+        return op;
+      });
+    } else {
+      const map = { 5: 'addBooleanOption', 6: 'addUserOption', 7: 'addChannelOption', 8: 'addRoleOption', 9: 'addMentionableOption', 11: 'addAttachmentOption' };
+      const method = map[o.type];
+      if (method) {
+        builder[method](opt => base(opt, o));
+      }
     }
-  });
-
+  }
   return builder;
 }
 

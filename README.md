@@ -12,6 +12,8 @@ A secure, production-ready Discord bot template with PostgreSQL support, compreh
 - ⚙️ **Environment-based configuration** for easy deployment
 - 🎯 **Permission system** with developer/owner roles
 - ⏱️ **Command cooldown** system
+- 🚩 **Per-command flags** for permissions, cooldowns, and access control
+- 🧪 **Smoke tests** via Node's built-in test runner (zero extra dependencies)
 - 📊 **Dynamic help menu** with autocomplete
 - 🔧 **Easy customization** with modular command structure
 
@@ -19,7 +21,7 @@ A secure, production-ready Discord bot template with PostgreSQL support, compreh
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js** >= 16.11.0 (LTS recommended)
+- **Node.js** >= 20.19.0 (LTS recommended)
 - **npm** >= 7.0.0
 - **PostgreSQL** >= 12.0 (optional, but recommended)
 - **Discord Bot Token** from [Discord Developer Portal](https://discord.com/developers/applications)
@@ -67,7 +69,7 @@ See [Environment Variables](#-environment-variables) for the complete list.
 
 ### 4. Set Up Database (Optional)
 
-If you're using PostgreSQL, the bot will automatically create the required tables on first run. Make sure your database server is running and accessible.
+If you're using PostgreSQL, the bot will automatically create the required tables on first run. Make sure your database server is running and accessible — see [Database](#️-database) for details.
 
 ### 5. Start the Bot
 
@@ -93,7 +95,7 @@ Discord-Bot-Template/
 │   │   ├── Client/         # Client events (ready, etc.)
 │   │   └── Interaction/    # Interaction events (commands, buttons)
 │   ├── Functions/
-│   │   ├── database.js     # Database manager
+│   │   ├── database.js     # Database manager (Prisma + parameterized SQL)
 │   │   ├── logger.js       # Discord webhook logger
 │   │   ├── validation.js   # Input validation utilities
 │   │   └── security-utils.js  # Security helper functions
@@ -102,9 +104,10 @@ Discord-Bot-Template/
 │   │   ├── events.js       # Event handler loader
 │   │   └── antiCrash.js    # Error handling and recovery
 │   └── Settings/
-│       ├── settings.json    # Bot configuration
+│       ├── settings.json    # Bot configuration (token via env, intents, statuses)
 │       ├── logs.json       # Logging configuration
 │       └── server.json     # Server configuration
+├── tests/                    # Smoke tests (`npm test`)
 ├── config.js               # Configuration management
 ├── index.js                # Main entry point
 ├── .env.example           # Environment variables template
@@ -158,6 +161,56 @@ module.exports = {
 
 3. Restart the bot - commands are automatically registered!
 
+## 🚩 Command Flags
+
+Set any of these exports on a command module to control access (all optional — see any file in `Src/Commands/Slash/` for examples):
+
+| Flag | Type | Effect |
+|------|------|--------|
+| `cooldown` | number (seconds) | Per-user cooldown (default 15s, developers bypass with 5s) |
+| `devOnly` | boolean | Only IDs in `SETTINGS_DEVELOPER_IDS` can use it |
+| `ownerOnly` | boolean | Only IDs in `SETTINGS_DEVELOPER_OWNER_IDS` can use it |
+| `guildOnly` | boolean | Blocks usage in DMs |
+| `nsfwOnly` | boolean | Only works in NSFW-marked channels |
+| `voiceOnly` | boolean | User must be connected to a voice channel |
+| `premiumOnly` | boolean | Only servers listed under `server.premiumGuilds` |
+| `allowedGuilds` | array or true | Restrict to specific guild IDs (`true` = everywhere) |
+| `memberPermissions` | string[] | Discord permissions the **user** needs (e.g. `['ManageMessages']`) |
+| `botPermissions` | string[] | Discord permissions the **bot** needs (e.g. `['EmbedLinks']`) |
+| `maintenanceCmd` | boolean | Disabled for everyone except developers |
+| `toggleOffCmd` | boolean | Hard-disables the command |
+
+Permission names are standard `PermissionsBitField.Flags` keys (`KickMembers`, `BanMembers`, `ManageRoles`, ...). Failed validation or permission checks never consume a user's cooldown.
+
+> ℹ️ Slash commands register **globally** on startup. Discord may take up to ~1 hour to show newly registered commands in every server — this is normal API behavior, not a bug.
+
+## ⚙️ Gateway Intents
+
+The bot requests its gateway intents from `Src/Settings/settings.json` under `client.intents`. The default list includes all three **privileged** intents, which must also be enabled in the [Developer Portal](https://discord.com/developers/applications) under *Bot → Privileged Gateway Intents*, or login fails with `Used disallowed intents`:
+
+- `GUILD_MEMBERS`
+- `GUILD_PRESENCES`
+- `MESSAGE_CONTENT`
+
+If your bot doesn't use them, delete those entries (and any other unused intents) from `settings.json` to run with least privilege.
+
+## 🗄️ Database
+
+On first boot the bot connects and creates all required tables (`guilds`, `users`, `user_guilds`, `commands`, `settings`, `cooldowns`) automatically.
+
+- Schema changes are **additive**: columns added to `Src/Functions/tableSchemas.js` are applied via `ALTER TABLE` at startup; existing data is untouched
+- For structural redesigns, use the Prisma CLI instead: `npm run db:migrate`
+- All queries are parameterized and identifier-validated against injection
+
+Useful environment variables:
+
+| Variable | Effect |
+|----------|--------|
+| `SERVER_POSTGRES_SSL=true` | Force `sslmode=require` on the connection |
+| `SERVER_POSTGRES_NOVERIFYSSL=true` | Accept invalid TLS certs (self-hosted setups) |
+| `DB_DEBUG=true` | Log every query with its duration |
+| `DB_AUTO_INIT=false` | Skip automatic table creation on localhost |
+
 ## 🔐 Environment Variables
 
 ### Required Variables
@@ -207,7 +260,7 @@ The bot supports logging to Discord webhooks:
 
 ## 🧪 Testing
 
-Run the test suite:
+Run the smoke tests (Node's built-in test runner — no extra dependencies):
 
 ```bash
 npm test
